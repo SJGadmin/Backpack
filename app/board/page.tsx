@@ -71,8 +71,8 @@ export default function BoardPage() {
     const cardId = searchParams.get('card');
     if (cardId && board) {
       const card = board.columns
-        .flatMap((col) => col.cards)
-        .find((c) => c.id === cardId);
+        .flatMap((col: ColumnType) => col.cards)
+        .find((c: CardType) => c.id === cardId);
       if (card) {
         setSelectedCard(card);
         setIsDrawerOpen(true);
