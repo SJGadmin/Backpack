@@ -78,10 +78,10 @@ export function KanbanColumn({
         className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50 dark:bg-slate-900/50 rounded-b-lg"
       >
         <SortableContext
-          items={column.cards.map((c) => c.id)}
+          items={column.cards.map((c: CardType) => c.id)}
           strategy={verticalListSortingStrategy}
         >
-          {column.cards.map((card) => (
+          {column.cards.map((card: CardType) => (
             <KanbanCard
               key={card.id}
               card={card}
