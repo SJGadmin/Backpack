@@ -39,7 +39,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
   // Extract events from cards and tasks
   const events: CalendarEvent[] = [];
 
-  cards.forEach((card) => {
+  cards.forEach((card: CardType) => {
     // Add card due dates
     if (card.dueDate) {
       events.push({
@@ -52,7 +52,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
     }
 
     // Add task due dates
-    card.tasks.forEach((task) => {
+    card.tasks.forEach((task: Task) => {
       if (task.dueDate) {
         events.push({
           id: `task-${task.id}`,
@@ -74,7 +74,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const getEventsForDay = (day: Date) => {
-    return events.filter((event) => isSameDay(event.date, day));
+    return events.filter((event: CalendarEvent) => isSameDay(event.date, day));
   };
 
   const previousMonth = () => {
@@ -109,7 +109,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
       </div>
 
       <div className="grid grid-cols-7 gap-1">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day: string) => (
           <div
             key={day}
             className="text-center text-sm font-semibold text-muted-foreground p-2"
@@ -118,7 +118,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
           </div>
         ))}
 
-        {days.map((day) => {
+        {days.map((day: Date) => {
           const dayEvents = getEventsForDay(day);
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isToday = isSameDay(day, new Date());
@@ -134,7 +134,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
                 {format(day, 'd')}
               </div>
               <div className="space-y-1">
-                {dayEvents.slice(0, 3).map((event) => (
+                {dayEvents.slice(0, 3).map((event: CalendarEvent) => (
                   <div
                     key={event.id}
                     onClick={() => onEventClick(event.cardId)}
