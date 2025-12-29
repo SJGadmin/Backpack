@@ -152,8 +152,8 @@ export async function moveCard(
       }),
       // Update cards that come after the insertion point
       ...destinationCards
-        .filter((c) => c.orderIndex >= newIndex)
-        .map((c) =>
+        .filter((c: { id: string; orderIndex: number }) => c.orderIndex >= newIndex)
+        .map((c: { id: string; orderIndex: number }) =>
           prisma.card.update({
             where: { id: c.id },
             data: { orderIndex: c.orderIndex + 1 },
@@ -167,7 +167,7 @@ export async function moveCard(
       orderBy: { orderIndex: 'asc' },
     });
 
-    const oldIndex = cards.findIndex((c) => c.id === cardId);
+    const oldIndex = cards.findIndex((c: { id: string }) => c.id === cardId);
     if (oldIndex === -1) throw new Error('Card not found in column');
 
     const reorderedCards = [...cards];
@@ -175,7 +175,7 @@ export async function moveCard(
     reorderedCards.splice(newIndex, 0, movedCard);
 
     await prisma.$transaction(
-      reorderedCards.map((c, index) =>
+      reorderedCards.map((c: { id: string }, index: number) =>
         prisma.card.update({
           where: { id: c.id },
           data: { orderIndex: index },
