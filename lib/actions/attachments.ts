@@ -49,7 +49,7 @@ export async function deleteAttachment(attachmentId: string) {
 
   // Extract path from URL
   const urlParts = attachment.fileUrl.split('/');
-  const bucketIndex = urlParts.findIndex((part) => part === process.env.SUPABASE_STORAGE_BUCKET || part === 'attachments');
+  const bucketIndex = urlParts.findIndex((part: string) => part === process.env.SUPABASE_STORAGE_BUCKET || part === 'attachments');
   const path = urlParts.slice(bucketIndex + 1).join('/');
 
   // Delete from Supabase Storage
