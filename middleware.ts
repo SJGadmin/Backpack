@@ -4,7 +4,20 @@ import { SessionData, sessionOptions } from '@/lib/session';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
-  const session = await getIronSession<SessionData>(request.cookies, response.cookies, sessionOptions);
+
+  // Convert cookies to the format iron-session expects
+  const req = {
+    headers: {
+      cookie: request.cookies.toString(),
+    },
+  };
+
+  const res = {
+    getHeader: (name: string) => response.headers.get(name),
+    setHeader: (name: string, value: string) => response.headers.set(name, value),
+  };
+
+  const session = await getIronSession<SessionData>(req as any, res as any, sessionOptions);
 
   const { pathname } = request.nextUrl;
 

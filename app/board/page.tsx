@@ -249,7 +249,7 @@ export default function BoardPage() {
 
     try {
       const results = await searchCards(searchQuery);
-      setSearchResults(results);
+      setSearchResults(results as unknown as CardType[]);
     } catch (error) {
       toast.error('Search failed');
     }

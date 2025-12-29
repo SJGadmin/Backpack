@@ -95,7 +95,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
     toast.success('Task added');
   };
 
-  const handleToggleTask = async (task: Task) => {
+  const handleToggleTask = async (task: { id: string; completed: boolean }) => {
     await updateTask(task.id, { completed: !task.completed });
   };
 
@@ -159,9 +159,9 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
   };
 
   const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate);
-  const incompleteTasks = card.tasks.filter((t: Task) => !t.completed);
+  const incompleteTasks = card.tasks.filter((t) => !t.completed);
   const overdueTasks = incompleteTasks.filter(
-    (t: Task) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
+    (t) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
   );
 
   return (
@@ -248,7 +248,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
               <div>
                 <Label className="text-base font-semibold flex items-center justify-between">
                   <span>
-                    Tasks ({card.tasks.filter((t: Task) => t.completed).length}/
+                    Tasks ({card.tasks.filter((t) => t.completed).length}/
                     {card.tasks.length})
                   </span>
                   {overdueTasks.length > 0 && (
@@ -258,7 +258,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
                   )}
                 </Label>
                 <div className="space-y-2 mt-2">
-                  {card.tasks.map((task: Task) => {
+                  {card.tasks.map((task) => {
                     const taskOverdue =
                       task.dueDate &&
                       !task.completed &&

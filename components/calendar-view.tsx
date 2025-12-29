@@ -39,7 +39,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
   // Extract events from cards and tasks
   const events: CalendarEvent[] = [];
 
-  cards.forEach((card: CardType) => {
+  cards.forEach((card) => {
     // Add card due dates
     if (card.dueDate) {
       events.push({
@@ -52,7 +52,7 @@ export function CalendarView({ cards, onEventClick }: CalendarViewProps) {
     }
 
     // Add task due dates
-    card.tasks.forEach((task: Task) => {
+    card.tasks.forEach((task) => {
       if (task.dueDate) {
         events.push({
           id: `task-${task.id}`,

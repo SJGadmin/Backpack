@@ -29,9 +29,9 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const incompleteTasks = card.tasks.filter((t: Task) => !t.completed);
+  const incompleteTasks = card.tasks.filter((t) => !t.completed);
   const overdueTasks = incompleteTasks.filter(
-    (t: Task) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
+    (t) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
   );
 
   const isOverdue = card.dueDate && isPast(new Date(card.dueDate)) && !isToday(new Date(card.dueDate));
@@ -63,7 +63,7 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
           {incompleteTasks.length > 0 && (
             <span className="flex items-center gap-1">
               <CheckSquare className="h-3 w-3" />
-              {card.tasks.filter((t: Task) => t.completed).length}/{card.tasks.length}
+              {card.tasks.filter((t) => t.completed).length}/{card.tasks.length}
               {overdueTasks.length > 0 && (
                 <AlertCircle className="h-3 w-3 text-red-500 ml-1" />
               )}
@@ -85,13 +85,13 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
           )}
         </div>
 
-        {incompleteTasks.some((t: Task) => t.assignedTo) && (
+        {incompleteTasks.some((t) => t.assignedTo) && (
           <div className="flex -space-x-2">
             {(Array.from(
               new Set(
                 incompleteTasks
-                  .filter((t: Task) => t.assignedTo)
-                  .map((t: Task) => t.assignedTo!.name)
+                  .filter((t) => t.assignedTo)
+                  .map((t) => t.assignedTo!.name)
               )
             ) as string[])
               .slice(0, 3)
