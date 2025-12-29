@@ -1,0 +1,164 @@
+// This is your Prisma schema file for Backpack Kanban PM
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cardsCreated     Card[]    @relation("CardCreatedBy")
+  tasksCreated     Task[]    @relation("TaskCreatedBy")
+  tasksAssigned    Task[]    @relation("TaskAssignedTo")
+  commentsCreated  Comment[] @relation("CommentCreatedBy")
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  columns Column[]
+}
+
+model Column {
+  id         String   @id @default(cuid())
+  boardId    String
+  name       String
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@index([boardId, orderIndex])
+}
+
+model Card {
+  id                String   @id @default(cuid())
+  columnId          String
+  title             String
+  description       String?  @db.Text // Rich text JSON
+  descriptionPlain  String?  @db.Text // Plain text for search
+  dueDate           DateTime?
+  orderIndex        Int
+  createdById       String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Full-text search
+  searchVector      String?  @db.Text // tsvector stored as text
+
+  // Relations
+  column         Column                 @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  createdBy      User                   @relation("CardCreatedBy", fields: [createdById], references: [id])
+  tasks          Task[]
+  comments       Comment[]
+  attachments    Attachment[]
+  customFields   CardCustomFieldValue[]
+
+  @@index([columnId, orderIndex])
+  @@index([createdById])
+  @@index([dueDate])
+}
+
+model CardCustomField {
+  id          String   @id @default(cuid())
+  name        String
+  fieldType   String   // "text", "number", "date", "select"
+  options     String?  // JSON array for select type
+  orderIndex  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  values CardCustomFieldValue[]
+
+  @@index([orderIndex])
+}
+
+model CardCustomFieldValue {
+  id       String @id @default(cuid())
+  cardId   String
+  fieldId  String
+  value    String @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  card  Card             @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  field CardCustomField  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, fieldId])
+  @@index([cardId])
+  @@index([fieldId])
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  cardId        String
+  text          String
+  completed     Boolean   @default(false)
+  dueDate       DateTime?
+  assignedToId  String?
+  createdById   String
+  orderIndex    Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  card       Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdBy  User  @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  assignedTo User? @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+
+  @@index([cardId, orderIndex])
+  @@index([assignedToId])
+  @@index([dueDate])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  cardId      String
+  text        String   @db.Text
+  textPlain   String   @db.Text // Plain text for search
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  card      Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdBy User @relation("CommentCreatedBy", fields: [createdById], references: [id])
+
+  @@index([cardId])
+  @@index([createdById])
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  cardId      String
+  fileName    String
+  fileUrl     String
+  fileSize    Int
+  mimeType    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+}
