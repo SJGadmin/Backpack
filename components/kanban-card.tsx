@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card as CardType } from '@/lib/types';
+import { Card as CardType, Task } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MessageSquare, Paperclip, CheckSquare, AlertCircle } from 'lucide-react';
@@ -29,9 +29,9 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const incompleteTasks = card.tasks.filter((t) => !t.completed);
+  const incompleteTasks = card.tasks.filter((t: Task) => !t.completed);
   const overdueTasks = incompleteTasks.filter(
-    (t) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
+    (t: Task) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
   );
 
   const isOverdue = card.dueDate && isPast(new Date(card.dueDate)) && !isToday(new Date(card.dueDate));
@@ -63,7 +63,7 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
           {incompleteTasks.length > 0 && (
             <span className="flex items-center gap-1">
               <CheckSquare className="h-3 w-3" />
-              {card.tasks.filter((t) => t.completed).length}/{card.tasks.length}
+              {card.tasks.filter((t: Task) => t.completed).length}/{card.tasks.length}
               {overdueTasks.length > 0 && (
                 <AlertCircle className="h-3 w-3 text-red-500 ml-1" />
               )}
@@ -85,17 +85,17 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
           )}
         </div>
 
-        {incompleteTasks.some((t) => t.assignedTo) && (
+        {incompleteTasks.some((t: Task) => t.assignedTo) && (
           <div className="flex -space-x-2">
             {Array.from(
               new Set(
                 incompleteTasks
-                  .filter((t) => t.assignedTo)
-                  .map((t) => t.assignedTo!.name)
+                  .filter((t: Task) => t.assignedTo)
+                  .map((t: Task) => t.assignedTo!.name)
               )
             )
               .slice(0, 3)
-              .map((name) => (
+              .map((name: string) => (
                 <div
                   key={name}
                   className="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-medium border-2 border-white dark:border-slate-800"
