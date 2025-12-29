@@ -159,9 +159,9 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
   };
 
   const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate);
-  const incompleteTasks = card.tasks.filter((t) => !t.completed);
+  const incompleteTasks = card.tasks.filter((t: Task) => !t.completed);
   const overdueTasks = incompleteTasks.filter(
-    (t) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
+    (t: Task) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
   );
 
   return (
@@ -248,7 +248,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
               <div>
                 <Label className="text-base font-semibold flex items-center justify-between">
                   <span>
-                    Tasks ({card.tasks.filter((t) => t.completed).length}/
+                    Tasks ({card.tasks.filter((t: Task) => t.completed).length}/
                     {card.tasks.length})
                   </span>
                   {overdueTasks.length > 0 && (
@@ -258,7 +258,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
                   )}
                 </Label>
                 <div className="space-y-2 mt-2">
-                  {card.tasks.map((task) => {
+                  {card.tasks.map((task: Task) => {
                     const taskOverdue =
                       task.dueDate &&
                       !task.completed &&
@@ -296,7 +296,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                                {users.map((user) => (
+                                {users.map((user: { id: string; name: string; email: string }) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
@@ -366,7 +366,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
                   Attachments ({card.attachments.length})
                 </Label>
                 <div className="space-y-2 mt-2">
-                  {card.attachments.map((attachment) => {
+                  {card.attachments.map((attachment: Attachment) => {
                     const isImage = attachment.mimeType.startsWith('image/');
                     return (
                       <div
@@ -443,7 +443,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
                   Comments ({card.comments.length})
                 </Label>
                 <div className="space-y-4 mt-2">
-                  {card.comments.map((comment) => (
+                  {card.comments.map((comment: Comment) => (
                     <div key={comment.id} className="flex gap-2">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback>
