@@ -87,15 +87,15 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
 
         {incompleteTasks.some((t: Task) => t.assignedTo) && (
           <div className="flex -space-x-2">
-            {Array.from(
+            {(Array.from(
               new Set(
                 incompleteTasks
                   .filter((t: Task) => t.assignedTo)
                   .map((t: Task) => t.assignedTo!.name)
               )
-            )
+            ) as string[])
               .slice(0, 3)
-              .map((name: string) => (
+              .map((name) => (
                 <div
                   key={name}
                   className="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-medium border-2 border-white dark:border-slate-800"
