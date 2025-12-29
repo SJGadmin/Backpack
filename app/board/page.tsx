@@ -71,7 +71,7 @@ export default function BoardPage() {
     const cardId = searchParams.get('card');
     if (cardId && board) {
       const card = board.columns
-        .flatMap((c) => c.cards)
+        .flatMap((col) => col.cards)
         .find((c) => c.id === cardId);
       if (card) {
         setSelectedCard(card);
