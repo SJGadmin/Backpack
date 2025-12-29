@@ -88,8 +88,8 @@ export default function BoardPage() {
 
         // Extract unique users
         const allUsers = new Set<string>();
-        data.columns.forEach((col) => {
-          col.cards.forEach((card) => {
+        data.columns.forEach((col: ColumnType) => {
+          col.cards.forEach((card: CardType) => {
             allUsers.add(JSON.stringify({
               id: card.createdBy.id,
               name: card.createdBy.name,
@@ -98,7 +98,7 @@ export default function BoardPage() {
           });
         });
 
-        setUsers(Array.from(allUsers).map((u) => JSON.parse(u)));
+        setUsers(Array.from(allUsers).map((u: string) => JSON.parse(u)));
       }
     } catch (error) {
       toast.error('Failed to load board');
@@ -117,8 +117,8 @@ export default function BoardPage() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const card = board?.columns
-      .flatMap((col) => col.cards)
-      .find((c) => c.id === active.id);
+      .flatMap((col: ColumnType) => col.cards)
+      .find((c: CardType) => c.id === active.id);
     setActiveCard(card || null);
   };
 
@@ -132,26 +132,26 @@ export default function BoardPage() {
     if (!over || !board) return;
 
     const activeCard = board.columns
-      .flatMap((col) => col.cards)
-      .find((c) => c.id === active.id);
+      .flatMap((col: ColumnType) => col.cards)
+      .find((c: CardType) => c.id === active.id);
 
     if (!activeCard) return;
 
     // Find destination column
-    let destinationColumn = board.columns.find((col) => col.id === over.id);
+    let destinationColumn = board.columns.find((col: ColumnType) => col.id === over.id);
     if (!destinationColumn) {
       const overCard = board.columns
-        .flatMap((col) => col.cards)
-        .find((c) => c.id === over.id);
-      destinationColumn = board.columns.find((col) =>
-        col.cards.some((c) => c.id === over.id)
+        .flatMap((col: ColumnType) => col.cards)
+        .find((c: CardType) => c.id === over.id);
+      destinationColumn = board.columns.find((col: ColumnType) =>
+        col.cards.some((c: CardType) => c.id === over.id)
       );
     }
 
     if (!destinationColumn) return;
 
     const destinationCards = destinationColumn.cards;
-    const overCard = destinationCards.find((c) => c.id === over.id);
+    const overCard = destinationCards.find((c: CardType) => c.id === over.id);
     const newIndex = overCard
       ? destinationCards.indexOf(overCard)
       : destinationCards.length;
@@ -314,7 +314,7 @@ export default function BoardPage() {
                 Search Results ({searchResults.length})
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((card) => (
+                {searchResults.map((card: CardType) => (
                   <div key={card.id} onClick={() => handleCardClick(card)}>
                     <KanbanCard card={card} onClick={() => handleCardClick(card)} />
                   </div>
@@ -342,7 +342,7 @@ export default function BoardPage() {
           >
             <div className="flex-1 overflow-x-auto p-6">
               <div className="flex gap-4 h-full">
-                {board.columns.map((column) => (
+                {board.columns.map((column: ColumnType) => (
                   <KanbanColumn
                     key={column.id}
                     column={column}
@@ -376,11 +376,11 @@ export default function BoardPage() {
         <TabsContent value="calendar" className="flex-1 overflow-auto m-0 p-6">
           <div className="bg-white dark:bg-slate-900 rounded-lg p-6">
             <CalendarView
-              cards={board?.columns.flatMap((col) => col.cards) || []}
-              onEventClick={async (cardId) => {
+              cards={board?.columns.flatMap((col: ColumnType) => col.cards) || []}
+              onEventClick={async (cardId: string) => {
                 const card = board?.columns
-                  .flatMap((col) => col.cards)
-                  .find((c) => c.id === cardId);
+                  .flatMap((col: ColumnType) => col.cards)
+                  .find((c: CardType) => c.id === cardId);
                 if (card) {
                   handleCardClick(card);
                 }
