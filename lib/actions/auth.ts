@@ -10,7 +10,7 @@ export async function login(formData: FormData) {
   const password = formData.get('password') as string;
 
   if (!email || !password) {
-    return { error: 'Email and password are required' };
+    redirect('/login?error=missing_fields');
   }
 
   // Find user by email
@@ -19,14 +19,14 @@ export async function login(formData: FormData) {
   });
 
   if (!user) {
-    return { error: 'Invalid email or password' };
+    redirect('/login?error=invalid_credentials');
   }
 
   // Verify password
   const isValidPassword = await bcrypt.compare(password, user.password);
 
   if (!isValidPassword) {
-    return { error: 'Invalid email or password' };
+    redirect('/login?error=invalid_credentials');
   }
 
   // Create session
