@@ -1,7 +1,7 @@
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
@@ -23,20 +23,21 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
+// Parse JSON content if it's a string, otherwise use as-is
+const parseContent = (content: string) => {
+  if (!content) return '';
+  try {
+    return JSON.parse(content);
+  } catch {
+    return content;
+  }
+};
+
 export function RichTextEditor({
   content,
   onChange,
   placeholder = 'Start typing...',
 }: RichTextEditorProps) {
-  // Parse JSON content if it's a string, otherwise use as-is
-  const parseContent = (content: string) => {
-    if (!content) return '';
-    try {
-      return JSON.parse(content);
-    } catch {
-      return content;
-    }
-  };
 
   const editor = useEditor({
     extensions: [
@@ -65,8 +66,14 @@ export function RichTextEditor({
 
   // Update editor content when prop changes
   useEffect(() => {
-    if (editor && content !== JSON.stringify(editor.getJSON())) {
-      editor.commands.setContent(parseContent(content));
+    if (!editor) return;
+
+    const currentContent = JSON.stringify(editor.getJSON());
+    const newContent = parseContent(content);
+
+    // Only update if content has actually changed
+    if (content && currentContent !== content) {
+      editor.commands.setContent(newContent, false);
     }
   }, [content, editor]);
 
