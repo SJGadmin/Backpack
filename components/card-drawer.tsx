@@ -62,7 +62,27 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
   useEffect(() => {
     if (card) {
       setTitle(card.title);
-      setDescription(card.description || '');
+
+      // Parse description - if it's JSON, extract the text
+      let desc = card.description || '';
+      try {
+        const json = JSON.parse(desc);
+        // Extract text from TipTap JSON format
+        if (json.type === 'doc' && json.content) {
+          desc = json.content
+            .map((node: any) => {
+              if (node.content) {
+                return node.content.map((n: any) => n.text || '').join('');
+              }
+              return '';
+            })
+            .join('\n');
+        }
+      } catch {
+        // Not JSON, use as-is
+      }
+
+      setDescription(desc);
       setDueDate(card.dueDate ? new Date(card.dueDate) : undefined);
     }
   }, [card]);
@@ -79,6 +99,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
   const handleUpdateDescription = async () => {
     if (description !== card.description) {
       await updateCard(card.id, { description });
+      router.refresh();
       toast.success('Description updated');
     }
   };
