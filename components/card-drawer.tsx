@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card as CardType, Task, Comment, Attachment } from '@/lib/types';
 import {
   Sheet,
@@ -26,7 +27,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { RichTextEditor } from './rich-text-editor';
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -51,6 +51,7 @@ interface CardDrawerProps {
 }
 
 export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<Date | undefined>();
@@ -92,25 +93,30 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
     if (!newTaskText.trim()) return;
     await createTask(card.id, newTaskText);
     setNewTaskText('');
+    router.refresh();
     toast.success('Task added');
   };
 
   const handleToggleTask = async (task: { id: string; completed: boolean }) => {
     await updateTask(task.id, { completed: !task.completed });
+    router.refresh();
   };
 
   const handleUpdateTaskAssignment = async (taskId: string, userId: string | null) => {
     await updateTask(taskId, { assignedToId: userId });
+    router.refresh();
     toast.success('Task assignment updated');
   };
 
   const handleUpdateTaskDueDate = async (taskId: string, date: Date | undefined) => {
     await updateTask(taskId, { dueDate: date || null });
+    router.refresh();
     toast.success('Task due date updated');
   };
 
   const handleDeleteTask = async (taskId: string) => {
     await deleteTask(taskId);
+    router.refresh();
     toast.success('Task deleted');
   };
 
@@ -118,11 +124,13 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
     if (!newComment.trim()) return;
     await createComment(card.id, newComment);
     setNewComment('');
+    router.refresh();
     toast.success('Comment added');
   };
 
   const handleDeleteComment = async (commentId: string) => {
     await deleteComment(commentId);
+    router.refresh();
     toast.success('Comment deleted');
   };
 
@@ -137,6 +145,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
         formData.append('file', file);
         await createAttachment(card.id, formData);
       }
+      router.refresh();
       toast.success('Files uploaded');
     } catch (error) {
       toast.error('Failed to upload files');
@@ -147,6 +156,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     await deleteAttachment(attachmentId);
+    router.refresh();
     toast.success('Attachment deleted');
   };
 
@@ -228,18 +238,13 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
               <div>
                 <Label className="text-base font-semibold">Description</Label>
                 <div className="mt-2">
-                  <RichTextEditor
-                    content={description}
-                    onChange={setDescription}
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onBlur={handleUpdateDescription}
                     placeholder="Add a description..."
+                    className="min-h-[120px]"
                   />
-                  <Button
-                    size="sm"
-                    onClick={handleUpdateDescription}
-                    className="mt-2"
-                  >
-                    Save
-                  </Button>
                 </div>
               </div>
 

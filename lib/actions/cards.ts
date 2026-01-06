@@ -10,25 +10,8 @@ function stripHtml(html: string): string {
 
 function extractPlainText(description: string | null): string {
   if (!description) return '';
-
-  try {
-    const json = JSON.parse(description);
-    let text = '';
-
-    const extractText = (node: any): void => {
-      if (node.text) {
-        text += node.text + ' ';
-      }
-      if (node.content && Array.isArray(node.content)) {
-        node.content.forEach(extractText);
-      }
-    };
-
-    extractText(json);
-    return text.trim();
-  } catch {
-    return stripHtml(description);
-  }
+  // Just return the text as-is since we're no longer using JSON
+  return description.trim();
 }
 
 export async function createCard(columnId: string, title: string) {
