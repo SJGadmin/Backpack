@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
+// Global prisma instance for development hot-reloading
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
