@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import {
   DndContext,
@@ -34,11 +36,10 @@ import { createCard, moveCard, searchCards } from '@/lib/actions/cards';
 import { logout, getCurrentUser } from '@/lib/actions/auth';
 import { Plus, Search, LogOut, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function BoardPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [board, setBoard] = useState<Board | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
@@ -66,19 +67,6 @@ export default function BoardPage() {
     loadBoard();
     loadCurrentUser();
   }, []);
-
-  useEffect(() => {
-    const cardId = searchParams.get('card');
-    if (cardId && board) {
-      const card = board.columns
-        .flatMap((col: ColumnType) => col.cards)
-        .find((c: CardType) => c.id === cardId);
-      if (card) {
-        setSelectedCard(card);
-        setIsDrawerOpen(true);
-      }
-    }
-  }, [searchParams, board]);
 
   const loadBoard = async () => {
     try {
