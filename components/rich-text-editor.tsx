@@ -73,7 +73,7 @@ export function RichTextEditor({
 
     // Only update if content has actually changed
     if (content && currentContent !== content) {
-      editor.commands.setContent(newContent, false);
+      editor.commands.setContent(newContent);
     }
   }, [content, editor]);
 

@@ -1,0 +1,6 @@
+id,boardId,name,orderIndex,createdAt,updatedAt
+main-board-backlog,main-board,Backlog,0,2025-12-29 16:03:36.016,2025-12-29 16:03:36.016
+main-board-done,main-board,Done,4,2025-12-29 16:03:36.016,2025-12-29 16:03:36.016
+main-board-in-progress,main-board,In Progress,2,2025-12-29 16:03:36.016,2025-12-29 16:03:36.016
+main-board-next-up,main-board,Next Up,1,2025-12-29 16:03:36.016,2025-12-29 16:03:36.016
+main-board-waiting,main-board,Waiting,3,2025-12-29 16:03:36.016,2025-12-29 16:03:36.016

@@ -58,45 +58,65 @@ export async function updateCard(
 
   const descriptionPlain = data.description ? extractPlainText(data.description) : undefined;
 
-  const card = await prisma.card.update({
-    where: { id: cardId },
-    data: {
-      ...data,
-      descriptionPlain,
-    },
-    include: {
-      createdBy: {
-        select: { id: true, name: true, email: true },
+  try {
+    const card = await prisma.card.update({
+      where: { id: cardId },
+      data: {
+        ...data,
+        descriptionPlain,
       },
-      tasks: {
-        include: {
-          assignedTo: {
-            select: { id: true, name: true, email: true },
+      include: {
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+        tasks: {
+          include: {
+            assignedTo: {
+              select: { id: true, name: true, email: true },
+            },
           },
         },
-      },
-      comments: {
-        include: {
-          createdBy: {
-            select: { id: true, name: true, email: true },
+        comments: {
+          include: {
+            createdBy: {
+              select: { id: true, name: true, email: true },
+            },
           },
         },
+        attachments: true,
       },
-      attachments: true,
-    },
-  });
+    });
 
-  revalidatePath('/board');
-  return card;
+    revalidatePath('/board');
+    return card;
+  } catch (error: any) {
+    // If record not found, return null instead of throwing
+    if (error.code === 'P2025') {
+      console.log(`Card ${cardId} not found for update`);
+      revalidatePath('/board');
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function deleteCard(cardId: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Unauthorized');
 
-  await prisma.card.delete({
-    where: { id: cardId },
-  });
+  try {
+    await prisma.card.delete({
+      where: { id: cardId },
+    });
+  } catch (error: any) {
+    // If record not found, it's already deleted - don't throw error
+    if (error.code === 'P2025') {
+      console.log(`Card ${cardId} already deleted or doesn't exist`);
+      revalidatePath('/board');
+      return;
+    }
+    throw error;
+  }
 
   revalidatePath('/board');
 }

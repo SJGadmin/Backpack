@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from './auth';
-import { uploadFile, deleteFile } from '@/lib/supabase';
+import { uploadFile, deleteFile } from '@/lib/storage';
 
 export async function createAttachment(
   cardId: string,
@@ -20,7 +20,7 @@ export async function createAttachment(
   const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
   const path = `cards/${cardId}/${timestamp}-${fileName}`;
 
-  // Upload to Supabase Storage
+  // Upload to Vercel Blob Storage
   const { url } = await uploadFile(file, path);
 
   const attachment = await prisma.attachment.create({
@@ -45,24 +45,34 @@ export async function deleteAttachment(attachmentId: string) {
     where: { id: attachmentId },
   });
 
-  if (!attachment) throw new Error('Attachment not found');
+  if (!attachment) {
+    console.log(`Attachment ${attachmentId} not found`);
+    revalidatePath('/board');
+    return;
+  }
 
-  // Extract path from URL
-  const urlParts = attachment.fileUrl.split('/');
-  const bucketIndex = urlParts.findIndex((part: string) => part === process.env.SUPABASE_STORAGE_BUCKET || part === 'attachments');
-  const path = urlParts.slice(bucketIndex + 1).join('/');
-
-  // Delete from Supabase Storage
+  // Delete from Vercel Blob Storage
+  // Vercel Blob's del() can accept the full URL directly
   try {
-    await deleteFile(path);
+    await deleteFile(attachment.fileUrl);
   } catch (error) {
     console.error('Failed to delete file from storage:', error);
   }
 
   // Delete from database
-  await prisma.attachment.delete({
-    where: { id: attachmentId },
-  });
+  try {
+    await prisma.attachment.delete({
+      where: { id: attachmentId },
+    });
+  } catch (error: any) {
+    // If record not found, it's already deleted - don't throw error
+    if (error.code === 'P2025') {
+      console.log(`Attachment ${attachmentId} already deleted from database`);
+      revalidatePath('/board');
+      return;
+    }
+    throw error;
+  }
 
   revalidatePath('/board');
 }
