@@ -1,5 +1,4 @@
 {
-  "buildCommand": "rm -rf node_modules .next && npm install && npm run build",
-  "installCommand": "npm ci --legacy-peer-deps",
+  "buildCommand": "bash clean-build.sh",
   "framework": "nextjs"
 }
