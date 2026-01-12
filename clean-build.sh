@@ -7,7 +7,7 @@ rm -rf .next
 echo "✅ Cleaned node_modules and .next"
 
 echo "📦 Installing dependencies..."
-npm ci --legacy-peer-deps
+npm ci --legacy-peer-deps --include=dev
 echo "✅ Dependencies installed"
 
 echo "🔧 Generating Prisma Client..."
@@ -15,5 +15,5 @@ npx prisma generate
 echo "✅ Prisma Client generated"
 
 echo "🏗️ Building Next.js application..."
-npm run build
+npx next build
 echo "✅ Build complete"
