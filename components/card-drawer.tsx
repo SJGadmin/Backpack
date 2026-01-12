@@ -4,6 +4,23 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card as CardType, Task, Comment, Attachment } from '@/lib/types';
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -38,10 +55,11 @@ import {
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { updateCard, deleteCard } from '@/lib/actions/cards';
-import { createTask, updateTask, deleteTask } from '@/lib/actions/tasks';
+import { createTask, updateTask, deleteTask, reorderTasks } from '@/lib/actions/tasks';
 import { createComment, deleteComment } from '@/lib/actions/comments';
 import { createAttachment, deleteAttachment } from '@/lib/actions/attachments';
 import { toast } from 'sonner';
+import { SortableTaskItem } from './sortable-task-item';
 
 interface CardDrawerProps {
   card: CardType | null;
@@ -59,6 +77,13 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   const [newTaskText, setNewTaskText] = useState('');
   const [newComment, setNewComment] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     if (card) {
@@ -136,10 +161,31 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
     toast.success('Task due date updated');
   };
 
+  const handleUpdateTaskText = async (taskId: string, text: string) => {
+    await updateTask(taskId, { text });
+    onUpdate?.();
+    toast.success('Task updated');
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     await deleteTask(taskId);
     onUpdate?.();
     toast.success('Task deleted');
+  };
+
+  const handleTaskDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = card.tasks.findIndex((t) => t.id === active.id);
+      const newIndex = card.tasks.findIndex((t) => t.id === over.id);
+
+      const newTasks = arrayMove(card.tasks, oldIndex, newIndex);
+      const taskIds = newTasks.map((t) => t.id);
+
+      await reorderTasks(card.id, taskIds);
+      onUpdate?.();
+    }
   };
 
   const handleAddComment = async () => {
@@ -295,91 +341,29 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                   )}
                 </Label>
                 <div className="space-y-2 mt-2">
-                  {card.tasks.map((task) => {
-                    const taskOverdue =
-                      task.dueDate &&
-                      !task.completed &&
-                      isPast(new Date(task.dueDate)) &&
-                      !isToday(new Date(task.dueDate));
-
-                    return (
-                      <div
-                        key={task.id}
-                        className={`flex items-start gap-2 p-2 rounded-md border ${
-                          taskOverdue ? 'border-red-200 bg-red-50 dark:bg-red-950/20' : ''
-                        }`}
-                      >
-                        <Checkbox
-                          checked={task.completed}
-                          onCheckedChange={() => handleToggleTask(task)}
-                          className="mt-1"
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTaskDragEnd}
+                  >
+                    <SortableContext
+                      items={card.tasks.map((t) => t.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {card.tasks.map((task) => (
+                        <SortableTaskItem
+                          key={task.id}
+                          task={task}
+                          users={users}
+                          onToggle={handleToggleTask}
+                          onUpdateAssignment={handleUpdateTaskAssignment}
+                          onUpdateDueDate={handleUpdateTaskDueDate}
+                          onUpdateText={handleUpdateTaskText}
+                          onDelete={handleDeleteTask}
                         />
-                        <div className="flex-1 space-y-2">
-                          <p className={task.completed ? 'line-through text-muted-foreground' : ''}>
-                            {task.text}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={task.assignedToId || 'unassigned'}
-                              onValueChange={(value) =>
-                                handleUpdateTaskAssignment(
-                                  task.id,
-                                  value === 'unassigned' ? null : value
-                                )
-                              }
-                            >
-                              <SelectTrigger className="w-32 h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="unassigned">Unassigned</SelectItem>
-                                {users.map((user: { id: string; name: string; email: string }) => (
-                                  <SelectItem key={user.id} value={user.id}>
-                                    {user.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className={`h-8 ${
-                                    taskOverdue ? 'border-red-500 text-red-600' : ''
-                                  }`}
-                                >
-                                  {taskOverdue && <AlertCircle className="mr-1 h-3 w-3" />}
-                                  <CalendarIcon className="mr-1 h-3 w-3" />
-                                  {task.dueDate
-                                    ? format(new Date(task.dueDate), 'MMM d')
-                                    : 'Due'}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={task.dueDate ? new Date(task.dueDate) : undefined}
-                                  onSelect={(date) =>
-                                    handleUpdateTaskDueDate(task.id, date)
-                                  }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                   <div className="flex gap-2">
                     <Input
                       placeholder="Add a task..."
