@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverActions: {
-    bodySizeLimit: '10mb', // Increase from default 1MB to 10MB for file uploads
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb', // Increase from default 1MB to 10MB for file uploads
+    },
   },
 };
 
