@@ -383,6 +383,7 @@ export default function BoardPage() {
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
         users={users}
+        onUpdate={loadBoard}
       />
 
       <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>

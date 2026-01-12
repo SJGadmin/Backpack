@@ -48,9 +48,10 @@ interface CardDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   users: Array<{ id: string; name: string; email: string }>;
+  onUpdate?: () => void;
 }
 
-export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
+export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawerProps) {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -99,7 +100,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
   const handleUpdateDescription = async () => {
     if (description !== card.description) {
       await updateCard(card.id, { description });
-      router.refresh();
+      onUpdate?.();
       toast.success('Description updated');
     }
   };
@@ -114,30 +115,30 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
     if (!newTaskText.trim()) return;
     await createTask(card.id, newTaskText);
     setNewTaskText('');
-    router.refresh();
+    onUpdate?.();
     toast.success('Task added');
   };
 
   const handleToggleTask = async (task: { id: string; completed: boolean }) => {
     await updateTask(task.id, { completed: !task.completed });
-    router.refresh();
+    onUpdate?.();
   };
 
   const handleUpdateTaskAssignment = async (taskId: string, userId: string | null) => {
     await updateTask(taskId, { assignedToId: userId });
-    router.refresh();
+    onUpdate?.();
     toast.success('Task assignment updated');
   };
 
   const handleUpdateTaskDueDate = async (taskId: string, date: Date | undefined) => {
     await updateTask(taskId, { dueDate: date || null });
-    router.refresh();
+    onUpdate?.();
     toast.success('Task due date updated');
   };
 
   const handleDeleteTask = async (taskId: string) => {
     await deleteTask(taskId);
-    router.refresh();
+    onUpdate?.();
     toast.success('Task deleted');
   };
 
@@ -145,13 +146,13 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
     if (!newComment.trim()) return;
     await createComment(card.id, newComment);
     setNewComment('');
-    router.refresh();
+    onUpdate?.();
     toast.success('Comment added');
   };
 
   const handleDeleteComment = async (commentId: string) => {
     await deleteComment(commentId);
-    router.refresh();
+    onUpdate?.();
     toast.success('Comment deleted');
   };
 
@@ -166,7 +167,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
         formData.append('file', file);
         await createAttachment(card.id, formData);
       }
-      router.refresh();
+      onUpdate?.();
       toast.success('Files uploaded');
     } catch (error) {
       toast.error('Failed to upload files');
@@ -177,7 +178,7 @@ export function CardDrawer({ card, isOpen, onClose, users }: CardDrawerProps) {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     await deleteAttachment(attachmentId);
-    router.refresh();
+    onUpdate?.();
     toast.success('Attachment deleted');
   };
 
