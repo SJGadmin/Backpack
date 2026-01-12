@@ -27,6 +27,8 @@ export type Comment = Prisma.CommentGetPayload<{
 
 export type Attachment = Prisma.AttachmentGetPayload<{}>;
 
+export type Link = Prisma.LinkGetPayload<{}>;
+
 export type Card = Prisma.CardGetPayload<{
   include: {
     createdBy: {
@@ -47,6 +49,7 @@ export type Card = Prisma.CardGetPayload<{
       };
     };
     attachments: true;
+    links: true;
   };
 }>;
 
@@ -72,6 +75,7 @@ export type Column = Prisma.ColumnGetPayload<{
           };
         };
         attachments: true;
+        links: true;
       };
     };
   };
@@ -101,6 +105,7 @@ export type Board = Prisma.BoardGetPayload<{
               };
             };
             attachments: true;
+            links: true;
           };
         };
       };

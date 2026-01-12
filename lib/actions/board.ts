@@ -38,6 +38,9 @@ export async function getBoard() {
               attachments: {
                 orderBy: { createdAt: 'desc' },
               },
+              links: {
+                orderBy: { orderIndex: 'asc' },
+              },
             },
           },
         },

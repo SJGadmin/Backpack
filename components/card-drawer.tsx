@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card as CardType, Task, Comment, Attachment } from '@/lib/types';
+import { Card as CardType, Task, Comment, Attachment, Link } from '@/lib/types';
 import {
   DndContext,
   closestCenter,
@@ -52,12 +52,14 @@ import {
   Download,
   X,
   AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { updateCard, deleteCard } from '@/lib/actions/cards';
 import { createTask, updateTask, deleteTask, reorderTasks } from '@/lib/actions/tasks';
 import { createComment, deleteComment } from '@/lib/actions/comments';
 import { createAttachment, deleteAttachment } from '@/lib/actions/attachments';
+import { createLink, deleteLink } from '@/lib/actions/links';
 import { toast } from 'sonner';
 import { SortableTaskItem } from './sortable-task-item';
 
@@ -78,6 +80,8 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   const [newComment, setNewComment] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [localTasks, setLocalTasks] = useState<any[]>([]);
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkTitle, setNewLinkTitle] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -248,6 +252,21 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
     await deleteAttachment(attachmentId);
     onUpdate?.();
     toast.success('Attachment deleted');
+  };
+
+  const handleAddLink = async () => {
+    if (!newLinkUrl.trim()) return;
+    await createLink(card.id, newLinkUrl, newLinkTitle || undefined);
+    setNewLinkUrl('');
+    setNewLinkTitle('');
+    onUpdate?.();
+    toast.success('Link added');
+  };
+
+  const handleDeleteLink = async (linkId: string) => {
+    await deleteLink(linkId);
+    onUpdate?.();
+    toast.success('Link deleted');
   };
 
   const handleDelete = async () => {
@@ -474,6 +493,80 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                     >
                       <Paperclip className="h-4 w-4 mr-2" />
                       {isUploading ? 'Uploading...' : 'Add attachment'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <Label className="text-base font-semibold">
+                  Links ({card.links.length})
+                </Label>
+                <div className="space-y-2 mt-2">
+                  {card.links.map((link: Link) => (
+                    <div
+                      key={link.id}
+                      className="flex items-center gap-2 p-2 rounded-md border"
+                    >
+                      <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-primary hover:underline truncate block"
+                        >
+                          {link.title || link.url}
+                        </a>
+                        {link.title && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {link.url}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteLink(link.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="URL (required)"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddLink();
+                        }
+                      }}
+                    />
+                    <Input
+                      placeholder="Title (optional)"
+                      value={newLinkTitle}
+                      onChange={(e) => setNewLinkTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddLink();
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleAddLink}
+                      className="w-full"
+                      disabled={!newLinkUrl.trim()}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add link
                     </Button>
                   </div>
                 </div>
