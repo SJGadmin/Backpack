@@ -256,8 +256,8 @@ export default function BoardPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
-      <header className="border-b bg-white dark:bg-slate-900 px-6 py-4 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-background">
+      <header className="border-b bg-card px-6 py-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Backpack</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export default function BoardPage() {
               }}
               className="w-64"
             />
-            <Button onClick={handleSearch} size="sm">
+            <Button onClick={handleSearch} size="sm" variant="default">
               Search
             </Button>
           </div>
@@ -288,7 +288,7 @@ export default function BoardPage() {
       </header>
 
       <Tabs defaultValue="kanban" className="flex-1 flex flex-col">
-        <div className="border-b px-6 bg-white dark:bg-slate-900">
+        <div className="border-b px-6 bg-card">
           <TabsList>
             <TabsTrigger value="kanban">Kanban</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
@@ -297,7 +297,7 @@ export default function BoardPage() {
 
         <TabsContent value="kanban" className="flex-1 overflow-hidden m-0">
           {searchResults.length > 0 && (
-            <div className="p-6 bg-white dark:bg-slate-900 border-b">
+            <div className="p-6 bg-card border-b">
               <h2 className="text-lg font-semibold mb-4">
                 Search Results ({searchResults.length})
               </h2>
@@ -362,7 +362,7 @@ export default function BoardPage() {
         </TabsContent>
 
         <TabsContent value="calendar" className="flex-1 overflow-auto m-0 p-6">
-          <div className="bg-white dark:bg-slate-900 rounded-lg p-6">
+          <div className="bg-card rounded-lg p-6">
             <CalendarView
               cards={board?.columns.flatMap((col: ColumnType) => col.cards) || []}
               onEventClick={async (cardId: string) => {

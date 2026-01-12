@@ -34,10 +34,10 @@ export function KanbanColumn({
 
   return (
     <div className="flex-shrink-0 w-80 flex flex-col max-h-full">
-      <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-t-lg">
+      <div className="flex items-center justify-between p-3 bg-card rounded-t-lg border-b">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold text-sm">{column.name}</h2>
-          <span className="text-xs text-muted-foreground bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
             {column.cards.length}
           </span>
         </div>
@@ -46,13 +46,13 @@ export function KanbanColumn({
             variant="ghost"
             size="sm"
             onClick={() => onAddCard(column.id)}
-            className="h-7 w-7 p-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
           >
             <Plus className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -75,7 +75,7 @@ export function KanbanColumn({
 
       <div
         ref={setNodeRef}
-        className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50 dark:bg-slate-900/50 rounded-b-lg"
+        className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-b-lg"
       >
         <SortableContext
           items={column.cards.map((c: CardType) => c.id)}
