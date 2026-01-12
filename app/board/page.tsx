@@ -87,6 +87,16 @@ export default function BoardPage() {
         });
 
         setUsers(Array.from(allUsers).map((u: string) => JSON.parse(u)));
+
+        // Update selected card if drawer is open
+        if (selectedCard) {
+          const updatedCard = data.columns
+            .flatMap((col: ColumnType) => col.cards)
+            .find((c: CardType) => c.id === selectedCard.id);
+          if (updatedCard) {
+            setSelectedCard(updatedCard);
+          }
+        }
       }
     } catch (error) {
       toast.error('Failed to load board');
