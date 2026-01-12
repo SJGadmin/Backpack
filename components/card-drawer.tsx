@@ -77,6 +77,7 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   const [newTaskText, setNewTaskText] = useState('');
   const [newComment, setNewComment] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [localTasks, setLocalTasks] = useState<any[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -88,6 +89,7 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   useEffect(() => {
     if (card) {
       setTitle(card.title);
+      setLocalTasks(card.tasks);
 
       // Parse description - if it's JSON, extract the text
       let desc = card.description || '';
@@ -145,31 +147,49 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   };
 
   const handleToggleTask = async (task: { id: string; completed: boolean }) => {
-    await updateTask(task.id, { completed: !task.completed });
-    onUpdate?.();
+    // Optimistic update
+    setLocalTasks(prev =>
+      prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t)
+    );
+    // Save to database in background
+    updateTask(task.id, { completed: !task.completed });
   };
 
   const handleUpdateTaskAssignment = async (taskId: string, userId: string | null) => {
-    await updateTask(taskId, { assignedToId: userId });
-    onUpdate?.();
+    // Optimistic update
+    setLocalTasks(prev =>
+      prev.map(t => t.id === taskId ? { ...t, assignedToId: userId } : t)
+    );
+    // Save to database in background
+    updateTask(taskId, { assignedToId: userId });
     toast.success('Task assignment updated');
   };
 
   const handleUpdateTaskDueDate = async (taskId: string, date: Date | undefined) => {
-    await updateTask(taskId, { dueDate: date || null });
-    onUpdate?.();
+    // Optimistic update
+    setLocalTasks(prev =>
+      prev.map(t => t.id === taskId ? { ...t, dueDate: date || null } : t)
+    );
+    // Save to database in background
+    updateTask(taskId, { dueDate: date || null });
     toast.success('Task due date updated');
   };
 
   const handleUpdateTaskText = async (taskId: string, text: string) => {
-    await updateTask(taskId, { text });
-    onUpdate?.();
+    // Optimistic update
+    setLocalTasks(prev =>
+      prev.map(t => t.id === taskId ? { ...t, text } : t)
+    );
+    // Save to database in background
+    updateTask(taskId, { text });
     toast.success('Task updated');
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    await deleteTask(taskId);
-    onUpdate?.();
+    // Optimistic update
+    setLocalTasks(prev => prev.filter(t => t.id !== taskId));
+    // Save to database in background
+    deleteTask(taskId);
     toast.success('Task deleted');
   };
 
@@ -177,14 +197,16 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = card.tasks.findIndex((t) => t.id === active.id);
-      const newIndex = card.tasks.findIndex((t) => t.id === over.id);
+      const oldIndex = localTasks.findIndex((t) => t.id === active.id);
+      const newIndex = localTasks.findIndex((t) => t.id === over.id);
 
-      const newTasks = arrayMove(card.tasks, oldIndex, newIndex);
+      // Optimistic update
+      const newTasks = arrayMove(localTasks, oldIndex, newIndex);
+      setLocalTasks(newTasks);
+
+      // Save to database in background
       const taskIds = newTasks.map((t) => t.id);
-
-      await reorderTasks(card.id, taskIds);
-      onUpdate?.();
+      reorderTasks(card.id, taskIds);
     }
   };
 
@@ -237,7 +259,7 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   };
 
   const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate);
-  const incompleteTasks = card.tasks.filter((t) => !t.completed);
+  const incompleteTasks = localTasks.filter((t) => !t.completed);
   const overdueTasks = incompleteTasks.filter(
     (t) => t.dueDate && isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate))
   );
@@ -331,8 +353,8 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
               <div>
                 <Label className="text-base font-semibold flex items-center justify-between">
                   <span>
-                    Tasks ({card.tasks.filter((t) => t.completed).length}/
-                    {card.tasks.length})
+                    Tasks ({localTasks.filter((t) => t.completed).length}/
+                    {localTasks.length})
                   </span>
                   {overdueTasks.length > 0 && (
                     <Badge variant="destructive">
@@ -347,10 +369,10 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                     onDragEnd={handleTaskDragEnd}
                   >
                     <SortableContext
-                      items={card.tasks.map((t) => t.id)}
+                      items={localTasks.map((t) => t.id)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {card.tasks.map((task) => (
+                      {localTasks.map((task) => (
                         <SortableTaskItem
                           key={task.id}
                           task={task}

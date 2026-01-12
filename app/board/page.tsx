@@ -131,6 +131,11 @@ export default function BoardPage() {
 
     if (!activeCard) return;
 
+    // Find source column
+    const sourceColumn = board.columns.find((col: ColumnType) =>
+      col.cards.some((c: CardType) => c.id === active.id)
+    );
+
     // Find destination column
     let destinationColumn = board.columns.find((col: ColumnType) => col.id === over.id);
     if (!destinationColumn) {
@@ -142,7 +147,7 @@ export default function BoardPage() {
       );
     }
 
-    if (!destinationColumn) return;
+    if (!destinationColumn || !sourceColumn) return;
 
     const destinationCards = destinationColumn.cards;
     const overCard = destinationCards.find((c: CardType) => c.id === over.id);
@@ -150,15 +155,38 @@ export default function BoardPage() {
       ? destinationCards.indexOf(overCard)
       : destinationCards.length;
 
+    // Optimistic update - update local state immediately
+    const updatedColumns = board.columns.map((col: ColumnType) => {
+      if (col.id === sourceColumn.id) {
+        // Remove card from source column
+        return {
+          ...col,
+          cards: col.cards.filter((c: CardType) => c.id !== activeCard.id)
+        };
+      } else if (col.id === destinationColumn.id) {
+        // Add card to destination column at the new index
+        const newCards = [...col.cards];
+        newCards.splice(newIndex, 0, activeCard);
+        return {
+          ...col,
+          cards: newCards
+        };
+      }
+      return col;
+    });
+
+    setBoard({ ...board, columns: updatedColumns });
+    setActiveCard(null);
+
+    // Save to database in background
     try {
       await moveCard(activeCard.id, destinationColumn.id, newIndex);
-      await loadBoard();
       toast.success('Card moved');
     } catch (error) {
       toast.error('Failed to move card');
+      // Revert on error
+      loadBoard();
     }
-
-    setActiveCard(null);
   };
 
   const handleAddColumn = () => {
