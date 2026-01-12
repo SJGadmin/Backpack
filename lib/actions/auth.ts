@@ -64,3 +64,16 @@ export async function getCurrentUser() {
 
   return user;
 }
+
+export async function getAllUsers() {
+  return await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      name: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+}

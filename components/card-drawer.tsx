@@ -203,12 +203,22 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
           <div className="p-6 space-y-6">
             <SheetHeader>
               <SheetTitle className="sr-only">Card Details</SheetTitle>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={handleUpdateTitle}
-                className="text-2xl font-bold border-0 px-0 focus-visible:ring-0"
-              />
+              <div className="flex items-start gap-2">
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={handleUpdateTitle}
+                  className="text-2xl font-bold border-0 px-0 focus-visible:ring-0 flex-1"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Created by {card.createdBy.name}</span>
                 <span>•</span>
@@ -509,17 +519,6 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                   </div>
                 </div>
               </div>
-
-              <Separator />
-
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Card
-              </Button>
             </div>
           </div>
         </ScrollArea>
