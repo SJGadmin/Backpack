@@ -33,7 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getBoard, createColumn, updateColumn, deleteColumn } from '@/lib/actions/board';
 import { createCard, moveCard, searchCards } from '@/lib/actions/cards';
-import { logout, getCurrentUser } from '@/lib/actions/auth';
+import { logout, getCurrentUser, getAllUsers } from '@/lib/actions/auth';
 import { Plus, Search, LogOut, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -66,6 +66,7 @@ export default function BoardPage() {
   useEffect(() => {
     loadBoard();
     loadCurrentUser();
+    loadAllUsers();
   }, []);
 
   const loadBoard = async () => {
@@ -73,20 +74,6 @@ export default function BoardPage() {
       const data = await getBoard();
       if (data) {
         setBoard(data);
-
-        // Extract unique users
-        const allUsers = new Set<string>();
-        data.columns.forEach((col: ColumnType) => {
-          col.cards.forEach((card: CardType) => {
-            allUsers.add(JSON.stringify({
-              id: card.createdBy.id,
-              name: card.createdBy.name,
-              email: card.createdBy.email,
-            }));
-          });
-        });
-
-        setUsers(Array.from(allUsers).map((u: string) => JSON.parse(u)));
 
         // Update selected card if drawer is open
         if (selectedCard) {
@@ -100,6 +87,15 @@ export default function BoardPage() {
       }
     } catch (error) {
       toast.error('Failed to load board');
+    }
+  };
+
+  const loadAllUsers = async () => {
+    try {
+      const allUsers = await getAllUsers();
+      setUsers(allUsers);
+    } catch (error) {
+      console.error('Failed to load users');
     }
   };
 
