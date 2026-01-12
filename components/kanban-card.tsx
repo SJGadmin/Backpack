@@ -42,7 +42,7 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 cursor-pointer hover:shadow-md transition-shadow bg-white dark:bg-slate-800"
+      className="p-3 cursor-pointer hover:shadow-md hover:border-primary/50 transition-all bg-card text-card-foreground"
       onClick={onClick}
     >
       <div className="space-y-2">
@@ -98,7 +98,7 @@ export function KanbanCard({ card, onClick }: KanbanCardProps) {
               .map((name) => (
                 <div
                   key={name}
-                  className="h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-medium border-2 border-white dark:border-slate-800"
+                  className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium border-2 border-card"
                 >
                   {name.charAt(0)}
                 </div>
