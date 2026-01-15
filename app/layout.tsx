@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Backpack - Project Management",
   description: "Kanban project management for Stewart & Jane Group",
+  icons: {
+    icon: "/Backpack Logo.png",
+  },
 };
 
 export default function RootLayout({

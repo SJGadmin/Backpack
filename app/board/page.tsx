@@ -292,7 +292,10 @@ export default function BoardPage() {
   return (
     <div className="h-screen flex flex-col bg-background">
       <header className="border-b bg-card px-6 py-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Backpack</h1>
+        <div className="flex items-center gap-3">
+          <img src="/Backpack No Background.png" alt="Backpack Logo" className="h-8 w-8" />
+          <h1 className="text-2xl font-bold">Backpack</h1>
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4 text-muted-foreground" />
