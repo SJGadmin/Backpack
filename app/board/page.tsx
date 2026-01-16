@@ -19,6 +19,7 @@ import { KanbanColumn } from '@/components/kanban-column';
 import { KanbanCard } from '@/components/kanban-card';
 import { CardDrawer } from '@/components/card-drawer';
 import { CalendarView } from '@/components/calendar-view';
+import { L10View } from '@/components/l10/l10-view';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,7 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getBoard, createColumn, updateColumn, deleteColumn } from '@/lib/actions/board';
 import { createCard, moveCard, searchCards } from '@/lib/actions/cards';
 import { logout, getCurrentUser, getAllUsers } from '@/lib/actions/auth';
-import { Plus, Search, LogOut, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Search, LogOut, Calendar as CalendarIcon, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -329,6 +330,10 @@ export default function BoardPage() {
           <TabsList>
             <TabsTrigger value="kanban">Kanban</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="l10">
+              <FileText className="h-4 w-4 mr-1" />
+              L10
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -412,6 +417,10 @@ export default function BoardPage() {
               }}
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="l10" className="flex-1 overflow-hidden m-0">
+          <L10View users={users} />
         </TabsContent>
       </Tabs>
 

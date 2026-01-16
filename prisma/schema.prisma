@@ -20,6 +20,14 @@ model User {
   tasksCreated     Task[]    @relation("TaskCreatedBy")
   tasksAssigned    Task[]    @relation("TaskAssignedTo")
   commentsCreated  Comment[] @relation("CommentCreatedBy")
+
+  // L10 Meeting Notes relations
+  l10SegueEntries   L10SegueEntry[]   @relation("L10SegueEntries")
+  l10Rocks          L10Rock[]         @relation("L10Rocks")
+  l10LastWeekTodos  L10LastWeekTodo[] @relation("L10LastWeekTodos")
+  l10IdsIssuesOwned L10IdsIssue[]     @relation("L10IdsIssueOwner")
+  l10NewTodos       L10NewTodo[]      @relation("L10NewTodos")
+  l10WrapScores     L10WrapScore[]    @relation("L10WrapScores")
 }
 
 model Board {
@@ -177,4 +185,229 @@ model Link {
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId, orderIndex])
+}
+
+// ============================================
+// L10 Meeting Notes Models
+// ============================================
+
+// Folder to organize meetings (Q1, Q2, January, etc.)
+model L10Folder {
+  id         String   @id @default(cuid())
+  name       String
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  documents L10Document[]
+
+  @@index([orderIndex])
+}
+
+// Individual L10 Meeting Document
+model L10Document {
+  id          String   @id @default(cuid())
+  folderId    String
+  title       String
+  meetingDate DateTime
+  weekNumber  Int?
+  orderIndex  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  folder          L10Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  segueEntries    L10SegueEntry[]
+  scorecardRows   L10ScorecardRow[]
+  rocks           L10Rock[]
+  lastWeekTodos   L10LastWeekTodo[]
+  idsIssues       L10IdsIssue[]
+  newTodos        L10NewTodo[]
+  wrapFeedback    L10WrapFeedback[]
+  wrapScores      L10WrapScore[]
+  parkingLotItems L10ParkingLotItem[]
+
+  @@index([folderId, orderIndex])
+  @@index([meetingDate])
+}
+
+// Segue: Quick check-in per team member
+model L10SegueEntry {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  text       String   @db.Text
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User        @relation("L10SegueEntries", fields: [userId], references: [id])
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+}
+
+// Configurable Scorecard Metrics (shared across all documents)
+model L10ScorecardMetric {
+  id         String   @id @default(cuid())
+  name       String
+  orderIndex Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  rows L10ScorecardRow[]
+
+  @@index([orderIndex])
+}
+
+// Scorecard Row: Metric value for a specific meeting
+model L10ScorecardRow {
+  id         String   @id @default(cuid())
+  documentId String
+  metricId   String
+  value      Float?
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  metric   L10ScorecardMetric @relation(fields: [metricId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, metricId])
+  @@index([documentId])
+}
+
+// Rocks: Quarterly goals per person with On/Off Track toggle
+model L10Rock {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  title      String
+  isOnTrack  Boolean  @default(true)
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User        @relation("L10Rocks", fields: [userId], references: [id])
+
+  @@index([documentId, userId])
+  @@index([orderIndex])
+}
+
+// Last Week To-Dos: Per person with Done/Not Done status
+model L10LastWeekTodo {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  text       String
+  isDone     Boolean  @default(false)
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User        @relation("L10LastWeekTodos", fields: [userId], references: [id])
+
+  @@index([documentId, userId])
+  @@index([orderIndex])
+}
+
+// IDS Issues: Numbered issues with I/D/S format
+model L10IdsIssue {
+  id          String    @id @default(cuid())
+  documentId  String
+  issueNumber Int
+  title       String
+  identify    String?   @db.Text
+  discuss     String?   @db.Text
+  solve       String?   @db.Text
+  ownerId     String?
+  dueDate     DateTime?
+  isResolved  Boolean   @default(false)
+  orderIndex  Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  owner    User?       @relation("L10IdsIssueOwner", fields: [ownerId], references: [id])
+
+  @@index([documentId, orderIndex])
+}
+
+// New To-Dos: Per person with due dates
+model L10NewTodo {
+  id          String    @id @default(cuid())
+  documentId  String
+  userId      String
+  text        String
+  dueDate     DateTime?
+  isCompleted Boolean   @default(false)
+  orderIndex  Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User        @relation("L10NewTodos", fields: [userId], references: [id])
+
+  @@index([documentId, userId])
+  @@index([orderIndex])
+}
+
+// Wrap Feedback: "What worked" and "What sucked"
+model L10WrapFeedback {
+  id         String   @id @default(cuid())
+  documentId String
+  type       String   // "worked" or "sucked"
+  text       String   @db.Text
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, type])
+}
+
+// Wrap Scores: Meeting scores (1-10) per person
+model L10WrapScore {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  score      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User        @relation("L10WrapScores", fields: [userId], references: [id])
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+}
+
+// Parking Lot: Bulleted list of future items
+model L10ParkingLotItem {
+  id         String   @id @default(cuid())
+  documentId String
+  text       String   @db.Text
+  orderIndex Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  document L10Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, orderIndex])
 }
