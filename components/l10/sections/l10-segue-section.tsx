@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { updateSegueEntry } from '@/lib/actions/l10';
 import type { L10SegueEntry, UserInfo } from '@/lib/types';
@@ -18,36 +17,64 @@ export function L10SegueSection({
   documentId,
   entries,
   users,
-  onUpdate,
 }: L10SegueSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [localEntries, setLocalEntries] = useState<Record<string, string>>({});
+  const initializedRef = useRef(false);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  // Get entry text for a user
-  const getEntryText = (userId: string) => {
-    if (localEntries[userId] !== undefined) {
-      return localEntries[userId];
+  // Initialize local state from props only once or when documentId changes
+  useEffect(() => {
+    if (!initializedRef.current || pendingSavesRef.current.size === 0) {
+      const entriesMap: Record<string, string> = {};
+      entries.forEach((e) => {
+        // Only update if not currently being edited
+        if (!pendingSavesRef.current.has(e.userId)) {
+          entriesMap[e.userId] = e.text;
+        }
+      });
+      setLocalEntries((prev) => ({
+        ...prev,
+        ...entriesMap,
+      }));
+      initializedRef.current = true;
     }
-    const entry = entries.find((e) => e.userId === userId);
-    return entry?.text || '';
-  };
+  }, [entries]);
+
+  // Reset when document changes
+  useEffect(() => {
+    initializedRef.current = false;
+    pendingSavesRef.current.clear();
+    const entriesMap: Record<string, string> = {};
+    entries.forEach((e) => {
+      entriesMap[e.userId] = e.text;
+    });
+    setLocalEntries(entriesMap);
+  }, [documentId]);
 
   const handleChange = (userId: string, text: string) => {
     setLocalEntries((prev) => ({ ...prev, [userId]: text }));
   };
 
   const handleBlur = async (userId: string) => {
-    const text = localEntries[userId];
-    if (text === undefined) return;
-
+    const text = localEntries[userId] ?? '';
     const existingEntry = entries.find((e) => e.userId === userId);
+
+    // Skip if no change
     if (existingEntry?.text === text) return;
+
+    // Mark as pending save to prevent overwrite from props
+    pendingSavesRef.current.add(userId);
 
     try {
       await updateSegueEntry(documentId, userId, text);
-      onUpdate();
     } catch (error) {
       console.error('Failed to update segue entry:', error);
+    } finally {
+      // Clear pending after a delay to allow for any prop updates to settle
+      setTimeout(() => {
+        pendingSavesRef.current.delete(userId);
+      }, 1000);
     }
   };
 
@@ -77,7 +104,7 @@ export function L10SegueSection({
                 <span className="text-sm font-medium">{user.name}</span>
               </div>
               <Textarea
-                value={getEntryText(user.id)}
+                value={localEntries[user.id] ?? ''}
                 onChange={(e) => handleChange(user.id, e.target.value)}
                 onBlur={() => handleBlur(user.id)}
                 placeholder="What's on your mind?"

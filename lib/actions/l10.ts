@@ -270,6 +270,22 @@ export async function deleteL10Document(documentId: string) {
   revalidatePath('/board');
 }
 
+export async function reorderL10Documents(documentIds: string[]) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  await prisma.$transaction(
+    documentIds.map((id, index) =>
+      prisma.l10Document.update({
+        where: { id },
+        data: { orderIndex: index },
+      })
+    )
+  );
+
+  revalidatePath('/board');
+}
+
 // ============================================
 // SEGUE ACTIONS
 // ============================================
@@ -972,4 +988,190 @@ export async function reorderParkingLotItems(
   );
 
   revalidatePath('/board');
+}
+
+// ============================================
+// CARRY-FORWARD ACTIONS
+// ============================================
+
+export async function getPreviousMeetingTodos(folderId: string, currentDocumentId: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // Get the current document to find its meeting date
+  const currentDoc = await prisma.l10Document.findUnique({
+    where: { id: currentDocumentId },
+    select: { meetingDate: true },
+  });
+
+  if (!currentDoc) return { document: null, todos: [] };
+
+  // Find the most recent document before this one in the same folder
+  const previousDoc = await prisma.l10Document.findFirst({
+    where: {
+      folderId,
+      id: { not: currentDocumentId },
+      meetingDate: { lt: currentDoc.meetingDate },
+    },
+    orderBy: { meetingDate: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      meetingDate: true,
+      weekNumber: true,
+    },
+  });
+
+  if (!previousDoc) return { document: null, todos: [] };
+
+  // Get the new todos from that document
+  const todos = await prisma.l10NewTodo.findMany({
+    where: { documentId: previousDoc.id },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return { document: previousDoc, todos };
+}
+
+export async function carryForwardTodosFromPreviousMeeting(
+  folderId: string,
+  targetDocumentId: string,
+  todoIds: string[]
+) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // Get the previous meeting's data
+  const { document: previousDoc, todos: allTodos } = await getPreviousMeetingTodos(
+    folderId,
+    targetDocumentId
+  );
+
+  if (!previousDoc) throw new Error('No previous meeting found');
+
+  // Filter to only the selected todos
+  const selectedTodos = allTodos.filter((t) => todoIds.includes(t.id));
+
+  // Get the max order index for last week todos in target document
+  const maxTodo = await prisma.l10LastWeekTodo.findFirst({
+    where: { documentId: targetDocumentId },
+    orderBy: { orderIndex: 'desc' },
+  });
+
+  let orderIndex = (maxTodo?.orderIndex ?? -1) + 1;
+
+  // Create as last week todos in the target document
+  const createdTodos = await prisma.$transaction(
+    selectedTodos.map((todo) =>
+      prisma.l10LastWeekTodo.create({
+        data: {
+          documentId: targetDocumentId,
+          userId: todo.userId,
+          text: todo.text,
+          isDone: false,
+          orderIndex: orderIndex++,
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      })
+    )
+  );
+
+  revalidatePath('/board');
+  return createdTodos;
+}
+
+export async function getPreviousMeetingRocks(folderId: string, currentDocumentId: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // Get the current document to find its meeting date
+  const currentDoc = await prisma.l10Document.findUnique({
+    where: { id: currentDocumentId },
+    select: { meetingDate: true },
+  });
+
+  if (!currentDoc) return { document: null, rocks: [] };
+
+  // Find the most recent document before this one in the same folder
+  const previousDoc = await prisma.l10Document.findFirst({
+    where: {
+      folderId,
+      id: { not: currentDocumentId },
+      meetingDate: { lt: currentDoc.meetingDate },
+    },
+    orderBy: { meetingDate: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      meetingDate: true,
+      weekNumber: true,
+    },
+  });
+
+  if (!previousDoc) return { document: null, rocks: [] };
+
+  // Get the rocks from that document
+  const rocks = await prisma.l10Rock.findMany({
+    where: { documentId: previousDoc.id },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return { document: previousDoc, rocks };
+}
+
+export async function carryForwardRocksFromPreviousMeeting(
+  folderId: string,
+  targetDocumentId: string,
+  rockIds: string[]
+) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // Get the previous meeting's data
+  const { document: previousDoc, rocks: allRocks } = await getPreviousMeetingRocks(
+    folderId,
+    targetDocumentId
+  );
+
+  if (!previousDoc) throw new Error('No previous meeting found');
+
+  // Filter to only the selected rocks
+  const selectedRocks = allRocks.filter((r) => rockIds.includes(r.id));
+
+  // Get the max order index for rocks in target document
+  const maxRock = await prisma.l10Rock.findFirst({
+    where: { documentId: targetDocumentId },
+    orderBy: { orderIndex: 'desc' },
+  });
+
+  let orderIndex = (maxRock?.orderIndex ?? -1) + 1;
+
+  // Create as rocks in the target document (resetting status to on track)
+  const createdRocks = await prisma.$transaction(
+    selectedRocks.map((rock) =>
+      prisma.l10Rock.create({
+        data: {
+          documentId: targetDocumentId,
+          userId: rock.userId,
+          title: rock.title,
+          isOnTrack: true, // Reset to on track for new week
+          orderIndex: orderIndex++,
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      })
+    )
+  );
+
+  revalidatePath('/board');
+  return createdRocks;
 }

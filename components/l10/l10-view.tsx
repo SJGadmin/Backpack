@@ -2,6 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { Plus, Folder, FileText, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,6 +23,8 @@ import {
   getL10Folders,
   getL10DocumentsForFolder,
   getL10Document,
+  reorderL10Folders,
+  reorderL10Documents,
 } from '@/lib/actions/l10';
 import type {
   L10FolderWithCount,
@@ -20,6 +35,8 @@ import type {
 import { L10FolderDialog } from './l10-folder-dialog';
 import { L10DocumentDialog } from './l10-document-dialog';
 import { L10DocumentEditor } from './l10-document-editor';
+import { SortableL10Folder } from './sortable-l10-folder';
+import { SortableL10Document } from './sortable-l10-document';
 
 interface L10ViewProps {
   users: UserInfo[];
@@ -35,6 +52,14 @@ export function L10View({ users }: L10ViewProps) {
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<L10FolderWithCount | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   // Load folders on mount
   useEffect(() => {
@@ -113,6 +138,48 @@ export function L10View({ users }: L10ViewProps) {
     }
   };
 
+  const handleFolderDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = folders.findIndex((f) => f.id === active.id);
+    const newIndex = folders.findIndex((f) => f.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newFolders = arrayMove(folders, oldIndex, newIndex);
+    setFolders(newFolders);
+
+    try {
+      await reorderL10Folders(newFolders.map((f) => f.id));
+    } catch (error) {
+      console.error('Failed to reorder folders:', error);
+      loadFolders(); // Revert on error
+    }
+  };
+
+  const handleDocumentDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = documents.findIndex((d) => d.id === active.id);
+    const newIndex = documents.findIndex((d) => d.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newDocuments = arrayMove(documents, oldIndex, newIndex);
+    setDocuments(newDocuments);
+
+    try {
+      await reorderL10Documents(newDocuments.map((d) => d.id));
+    } catch (error) {
+      console.error('Failed to reorder documents:', error);
+      if (selectedFolderId) {
+        loadDocuments(selectedFolderId); // Revert on error
+      }
+    }
+  };
+
   const selectedFolder = folders.find((f) => f.id === selectedFolderId);
 
   if (isLoading) {
@@ -151,29 +218,25 @@ export function L10View({ users }: L10ViewProps) {
                 No folders yet
               </p>
             ) : (
-              folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => setSelectedFolderId(folder.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedFolderId === folder.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-accent'
-                  }`}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleFolderDragEnd}
+              >
+                <SortableContext
+                  items={folders.map((f) => f.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <Folder className="h-4 w-4 flex-shrink-0" />
-                  <span className="flex-1 text-left truncate">{folder.name}</span>
-                  <span
-                    className={`text-xs ${
-                      selectedFolderId === folder.id
-                        ? 'text-primary-foreground/70'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {folder._count.documents}
-                  </span>
-                </button>
-              ))
+                  {folders.map((folder) => (
+                    <SortableL10Folder
+                      key={folder.id}
+                      folder={folder}
+                      isSelected={selectedFolderId === folder.id}
+                      onClick={() => setSelectedFolderId(folder.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         </ScrollArea>
@@ -208,34 +271,25 @@ export function L10View({ users }: L10ViewProps) {
                 No meetings yet
               </p>
             ) : (
-              documents.map((doc) => (
-                <button
-                  key={doc.id}
-                  onClick={() => setSelectedDocumentId(doc.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedDocumentId === doc.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-accent'
-                  }`}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDocumentDragEnd}
+              >
+                <SortableContext
+                  items={documents.map((d) => d.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <FileText className="h-4 w-4 flex-shrink-0" />
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="truncate font-medium">
-                      {doc.weekNumber ? `Week ${doc.weekNumber}` : format(new Date(doc.meetingDate), 'MMM d')}
-                    </p>
-                    <p
-                      className={`text-xs truncate ${
-                        selectedDocumentId === doc.id
-                          ? 'text-primary-foreground/70'
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      {format(new Date(doc.meetingDate), 'MMM d, yyyy')}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 flex-shrink-0 opacity-50" />
-                </button>
-              ))
+                  {documents.map((doc) => (
+                    <SortableL10Document
+                      key={doc.id}
+                      document={doc}
+                      isSelected={selectedDocumentId === doc.id}
+                      onClick={() => setSelectedDocumentId(doc.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         </ScrollArea>
@@ -243,9 +297,10 @@ export function L10View({ users }: L10ViewProps) {
 
       {/* Document Editor */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {document ? (
+        {document && selectedFolderId ? (
           <L10DocumentEditor
             document={document}
+            folderId={selectedFolderId}
             users={users}
             onUpdate={handleDocumentUpdated}
           />

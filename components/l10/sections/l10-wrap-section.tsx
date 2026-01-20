@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -42,14 +42,38 @@ export function L10WrapSection({
   const [newSucked, setNewSucked] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [localFeedback, setLocalFeedback] = useState<L10WrapFeedback[]>(feedback);
+  const [localScores, setLocalScores] = useState<L10WrapScore[]>(scores);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  const workedFeedback = feedback.filter((f) => f.type === 'worked');
-  const suckedFeedback = feedback.filter((f) => f.type === 'sucked');
+  // Sync local state with props when not pending saves
+  useEffect(() => {
+    if (pendingSavesRef.current.size === 0) {
+      setLocalFeedback(feedback);
+    } else {
+      setLocalFeedback((prev) =>
+        prev.map((f) =>
+          pendingSavesRef.current.has(f.id)
+            ? f
+            : feedback.find((pf) => pf.id === f.id) || f
+        )
+      );
+    }
+  }, [feedback]);
+
+  useEffect(() => {
+    if (pendingSavesRef.current.size === 0) {
+      setLocalScores(scores);
+    }
+  }, [scores]);
+
+  const workedFeedback = localFeedback.filter((f) => f.type === 'worked');
+  const suckedFeedback = localFeedback.filter((f) => f.type === 'sucked');
 
   // Calculate average score
   const avgScore =
-    scores.length > 0
-      ? (scores.reduce((sum, s) => sum + s.score, 0) / scores.length).toFixed(1)
+    localScores.length > 0
+      ? (localScores.reduce((sum, s) => sum + s.score, 0) / localScores.length).toFixed(1)
       : '-';
 
   const handleAddFeedback = async (type: 'worked' | 'sucked') => {
@@ -78,20 +102,44 @@ export function L10WrapSection({
       return;
     }
 
+    const originalFeedback = localFeedback.find((f) => f.id === feedbackId);
+    if (!originalFeedback || originalFeedback.text === editingText.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    // Optimistic update
+    setLocalFeedback((prev) =>
+      prev.map((f) => (f.id === feedbackId ? { ...f, text: editingText.trim() } : f))
+    );
+    pendingSavesRef.current.add(feedbackId);
+    setEditingId(null);
+
     try {
       await updateWrapFeedback(feedbackId, editingText.trim());
-      setEditingId(null);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalFeedback((prev) =>
+        prev.map((f) => (f.id === feedbackId ? { ...f, text: originalFeedback.text } : f))
+      );
       toast.error('Failed to update feedback');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(feedbackId);
+      }, 1000);
     }
   };
 
   const handleDeleteFeedback = async (feedbackId: string) => {
+    // Optimistic update
+    const originalFeedback = [...localFeedback];
+    setLocalFeedback((prev) => prev.filter((f) => f.id !== feedbackId));
+
     try {
       await deleteWrapFeedback(feedbackId);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalFeedback(originalFeedback);
       toast.error('Failed to delete feedback');
     }
   };
@@ -99,16 +147,37 @@ export function L10WrapSection({
   const handleScoreChange = async (userId: string, score: number) => {
     if (score < 1 || score > 10) return;
 
+    // Optimistic update
+    const existingScoreIndex = localScores.findIndex((s) => s.userId === userId);
+    const previousScores = [...localScores];
+
+    if (existingScoreIndex >= 0) {
+      setLocalScores((prev) =>
+        prev.map((s) => (s.userId === userId ? { ...s, score } : s))
+      );
+    } else {
+      setLocalScores((prev) => [
+        ...prev,
+        { id: `temp-${userId}`, documentId, userId, score } as L10WrapScore,
+      ]);
+    }
+    pendingSavesRef.current.add(`score-${userId}`);
+
     try {
       await upsertWrapScore(documentId, userId, score);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalScores(previousScores);
       toast.error('Failed to update score');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(`score-${userId}`);
+      }, 1000);
     }
   };
 
   const getScore = (userId: string) => {
-    const score = scores.find((s) => s.userId === userId);
+    const score = localScores.find((s) => s.userId === userId);
     return score?.score || '';
   };
 
@@ -125,7 +194,7 @@ export function L10WrapSection({
         )}
         <Sparkles className="h-4 w-4 text-primary" />
         <h2 className="font-semibold">Wrap</h2>
-        {scores.length > 0 && (
+        {localScores.length > 0 && (
           <span className="text-sm text-muted-foreground ml-auto">
             Avg score: {avgScore}
           </span>

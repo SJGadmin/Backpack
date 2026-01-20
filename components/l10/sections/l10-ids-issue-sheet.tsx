@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon, Check } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -39,6 +39,7 @@ interface L10IdsIssueSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
+  onOptimisticUpdate?: (issue: L10IdsIssue) => void;
 }
 
 export function L10IdsIssueSheet({
@@ -47,6 +48,7 @@ export function L10IdsIssueSheet({
   open,
   onOpenChange,
   onUpdate,
+  onOptimisticUpdate,
 }: L10IdsIssueSheetProps) {
   const [title, setTitle] = useState('');
   const [identify, setIdentify] = useState('');
@@ -55,28 +57,56 @@ export function L10IdsIssueSheet({
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [isResolved, setIsResolved] = useState(false);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
 
   // Update local state when issue changes
   useEffect(() => {
     if (issue) {
-      setTitle(issue.title);
-      setIdentify(issue.identify || '');
-      setDiscuss(issue.discuss || '');
-      setSolve(issue.solve || '');
-      setOwnerId(issue.ownerId);
-      setDueDate(issue.dueDate ? new Date(issue.dueDate) : null);
-      setIsResolved(issue.isResolved);
+      // Only update fields that aren't currently being saved
+      if (!pendingSavesRef.current.has('title')) setTitle(issue.title);
+      if (!pendingSavesRef.current.has('identify')) setIdentify(issue.identify || '');
+      if (!pendingSavesRef.current.has('discuss')) setDiscuss(issue.discuss || '');
+      if (!pendingSavesRef.current.has('solve')) setSolve(issue.solve || '');
+      if (!pendingSavesRef.current.has('ownerId')) setOwnerId(issue.ownerId);
+      if (!pendingSavesRef.current.has('dueDate')) setDueDate(issue.dueDate ? new Date(issue.dueDate) : null);
+      if (!pendingSavesRef.current.has('isResolved')) setIsResolved(issue.isResolved);
     }
   }, [issue]);
 
   const handleSave = async (field: string, value: any) => {
     if (!issue) return;
 
+    pendingSavesRef.current.add(field);
+
+    // Optimistic update - update parent immediately
+    if (onOptimisticUpdate) {
+      const updatedIssue = { ...issue, [field]: value };
+      // Special handling for owner - need to include the full owner object
+      if (field === 'ownerId') {
+        const owner = value ? users.find((u) => u.id === value) || null : null;
+        updatedIssue.owner = owner;
+      }
+      onOptimisticUpdate(updatedIssue);
+    }
+
     try {
       await updateIdsIssue(issue.id, { [field]: value });
-      onUpdate();
     } catch (error) {
       toast.error('Failed to update issue');
+      // Revert local state on error
+      if (issue) {
+        if (field === 'title') setTitle(issue.title);
+        if (field === 'identify') setIdentify(issue.identify || '');
+        if (field === 'discuss') setDiscuss(issue.discuss || '');
+        if (field === 'solve') setSolve(issue.solve || '');
+        if (field === 'ownerId') setOwnerId(issue.ownerId);
+        if (field === 'dueDate') setDueDate(issue.dueDate ? new Date(issue.dueDate) : null);
+        if (field === 'isResolved') setIsResolved(issue.isResolved);
+      }
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(field);
+      }, 1000);
     }
   };
 

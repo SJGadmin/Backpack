@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Target, Plus, X, Circle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronDown, ChevronRight, Target, Plus, X, Circle, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,6 +20,7 @@ interface L10RocksSectionProps {
   rocks: L10Rock[];
   users: UserInfo[];
   onUpdate: () => void;
+  onCarryForward?: () => void;
 }
 
 export function L10RocksSection({
@@ -27,16 +28,35 @@ export function L10RocksSection({
   rocks,
   users,
   onUpdate,
+  onCarryForward,
 }: L10RocksSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [newRockUserId, setNewRockUserId] = useState<string>('');
   const [newRockTitle, setNewRockTitle] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [localRocks, setLocalRocks] = useState<L10Rock[]>(rocks);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
+
+  // Sync local state with props when not pending saves
+  useEffect(() => {
+    if (pendingSavesRef.current.size === 0) {
+      setLocalRocks(rocks);
+    } else {
+      // Only update rocks that aren't being saved
+      setLocalRocks((prev) =>
+        prev.map((r) =>
+          pendingSavesRef.current.has(r.id)
+            ? r
+            : rocks.find((pr) => pr.id === r.id) || r
+        )
+      );
+    }
+  }, [rocks]);
 
   // Group rocks by user
   const rocksByUser = users.reduce((acc, user) => {
-    acc[user.id] = rocks.filter((r) => r.userId === user.id);
+    acc[user.id] = localRocks.filter((r) => r.userId === user.id);
     return acc;
   }, {} as Record<string, L10Rock[]>);
 
@@ -56,11 +76,25 @@ export function L10RocksSection({
   };
 
   const handleToggleStatus = async (rock: L10Rock) => {
+    // Optimistic update
+    const newStatus = !rock.isOnTrack;
+    setLocalRocks((prev) =>
+      prev.map((r) => (r.id === rock.id ? { ...r, isOnTrack: newStatus } : r))
+    );
+    pendingSavesRef.current.add(rock.id);
+
     try {
-      await updateRock(rock.id, { isOnTrack: !rock.isOnTrack });
-      onUpdate();
+      await updateRock(rock.id, { isOnTrack: newStatus });
     } catch (error) {
+      // Revert on error
+      setLocalRocks((prev) =>
+        prev.map((r) => (r.id === rock.id ? { ...r, isOnTrack: rock.isOnTrack } : r))
+      );
       toast.error('Failed to update rock status');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(rock.id);
+      }, 1000);
     }
   };
 
@@ -70,51 +104,88 @@ export function L10RocksSection({
       return;
     }
 
+    const originalRock = localRocks.find((r) => r.id === rockId);
+    if (!originalRock || originalRock.title === editingTitle.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    // Optimistic update
+    setLocalRocks((prev) =>
+      prev.map((r) => (r.id === rockId ? { ...r, title: editingTitle.trim() } : r))
+    );
+    pendingSavesRef.current.add(rockId);
+    setEditingId(null);
+
     try {
       await updateRock(rockId, { title: editingTitle.trim() });
-      setEditingId(null);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalRocks((prev) =>
+        prev.map((r) => (r.id === rockId ? { ...r, title: originalRock.title } : r))
+      );
       toast.error('Failed to update rock');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(rockId);
+      }, 1000);
     }
   };
 
   const handleDeleteRock = async (rockId: string) => {
+    // Optimistic update
+    const originalRocks = [...localRocks];
+    setLocalRocks((prev) => prev.filter((r) => r.id !== rockId));
+
     try {
       await deleteRock(rockId);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalRocks(originalRocks);
       toast.error('Failed to delete rock');
     }
   };
 
   return (
     <div className="bg-card rounded-lg border">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 p-4 hover:bg-accent/50 transition-colors"
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-        <Target className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">Rocks</h2>
-        <span className="text-sm text-muted-foreground ml-2">
-          (Quarterly goals)
-        </span>
-        <div className="flex items-center gap-4 ml-auto">
-          <span className="flex items-center gap-1 text-sm">
-            <Circle className="h-3 w-3 fill-green-500 text-green-500" />
-            On Track
+      <div className="flex items-center">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 flex items-center gap-2 p-4 hover:bg-accent/50 transition-colors"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+          <Target className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Rocks</h2>
+          <span className="text-sm text-muted-foreground ml-2">
+            (Quarterly goals)
           </span>
+          <div className="flex items-center gap-4 ml-auto">
+            <span className="flex items-center gap-1 text-sm">
+              <Circle className="h-3 w-3 fill-green-500 text-green-500" />
+              On Track
+            </span>
           <span className="flex items-center gap-1 text-sm">
             <Circle className="h-3 w-3 fill-red-500 text-red-500" />
             Off Track
           </span>
-        </div>
-      </button>
+          </div>
+        </button>
+        {onCarryForward && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mr-2"
+            onClick={onCarryForward}
+            title="Carry forward from last meeting"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4">

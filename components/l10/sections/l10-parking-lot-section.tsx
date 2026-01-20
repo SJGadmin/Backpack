@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, ParkingCircle, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,23 @@ export function L10ParkingLotSection({
   const [newItemText, setNewItemText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [localItems, setLocalItems] = useState<L10ParkingLotItem[]>(items);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
+
+  // Sync local state with props when not pending saves
+  useEffect(() => {
+    if (pendingSavesRef.current.size === 0) {
+      setLocalItems(items);
+    } else {
+      setLocalItems((prev) =>
+        prev.map((i) =>
+          pendingSavesRef.current.has(i.id)
+            ? i
+            : items.find((pi) => pi.id === i.id) || i
+        )
+      );
+    }
+  }, [items]);
 
   const handleAddItem = async () => {
     if (!newItemText.trim()) {
@@ -49,20 +66,44 @@ export function L10ParkingLotSection({
       return;
     }
 
+    const originalItem = localItems.find((i) => i.id === itemId);
+    if (!originalItem || originalItem.text === editingText.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    // Optimistic update
+    setLocalItems((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, text: editingText.trim() } : i))
+    );
+    pendingSavesRef.current.add(itemId);
+    setEditingId(null);
+
     try {
       await updateParkingLotItem(itemId, editingText.trim());
-      setEditingId(null);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalItems((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, text: originalItem.text } : i))
+      );
       toast.error('Failed to update item');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(itemId);
+      }, 1000);
     }
   };
 
   const handleDeleteItem = async (itemId: string) => {
+    // Optimistic update
+    const originalItems = [...localItems];
+    setLocalItems((prev) => prev.filter((i) => i.id !== itemId));
+
     try {
       await deleteParkingLotItem(itemId);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalItems(originalItems);
       toast.error('Failed to delete item');
     }
   };
@@ -88,12 +129,12 @@ export function L10ParkingLotSection({
       {isExpanded && (
         <div className="px-4 pb-4 space-y-2">
           <div className="space-y-1">
-            {items.length === 0 && (
+            {localItems.length === 0 && (
               <p className="text-sm text-muted-foreground italic py-2">
                 No items in parking lot
               </p>
             )}
-            {items.map((item) => (
+            {localItems.map((item) => (
               <div key={item.id} className="flex items-center gap-2 group py-1">
                 <span className="text-muted-foreground">•</span>
                 {editingId === item.id ? (

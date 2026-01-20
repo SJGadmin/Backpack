@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronDown,
@@ -37,6 +37,19 @@ export function L10IdsSection({
   const [newIssueTitle, setNewIssueTitle] = useState('');
   const [selectedIssue, setSelectedIssue] = useState<L10IdsIssue | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [localIssues, setLocalIssues] = useState<L10IdsIssue[]>(issues);
+  const pendingDeletesRef = useRef<Set<string>>(new Set());
+
+  // Sync local state with props
+  useEffect(() => {
+    // Filter out pending deletes but keep other updates
+    setLocalIssues(issues.filter((i) => !pendingDeletesRef.current.has(i.id)));
+    // Update selected issue if it was updated
+    if (selectedIssue) {
+      const updated = issues.find((i) => i.id === selectedIssue.id);
+      if (updated) setSelectedIssue(updated);
+    }
+  }, [issues]);
 
   const handleAddIssue = async () => {
     if (!newIssueTitle.trim()) {
@@ -54,17 +67,34 @@ export function L10IdsSection({
   };
 
   const handleDeleteIssue = async (issueId: string) => {
+    // Optimistic update
+    const originalIssues = [...localIssues];
+    setLocalIssues((prev) => prev.filter((i) => i.id !== issueId));
+    pendingDeletesRef.current.add(issueId);
+
     try {
       await deleteIdsIssue(issueId);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalIssues(originalIssues);
       toast.error('Failed to delete issue');
+    } finally {
+      setTimeout(() => {
+        pendingDeletesRef.current.delete(issueId);
+      }, 1000);
     }
   };
 
   const handleIssueClick = (issue: L10IdsIssue) => {
     setSelectedIssue(issue);
     setIsSheetOpen(true);
+  };
+
+  const handleIssueUpdate = (updatedIssue: L10IdsIssue) => {
+    setLocalIssues((prev) =>
+      prev.map((i) => (i.id === updatedIssue.id ? updatedIssue : i))
+    );
+    setSelectedIssue(updatedIssue);
   };
 
   return (
@@ -83,9 +113,9 @@ export function L10IdsSection({
         <span className="text-sm text-muted-foreground ml-2">
           (Identify, Discuss, Solve)
         </span>
-        {issues.length > 0 && (
+        {localIssues.length > 0 && (
           <span className="text-sm text-muted-foreground ml-auto">
-            {issues.filter((i) => i.isResolved).length}/{issues.length} resolved
+            {localIssues.filter((i) => i.isResolved).length}/{localIssues.length} resolved
           </span>
         )}
       </button>
@@ -98,7 +128,7 @@ export function L10IdsSection({
 
           {/* Issues list */}
           <div className="space-y-2">
-            {issues.map((issue) => (
+            {localIssues.map((issue) => (
               <div
                 key={issue.id}
                 className={`flex items-center gap-3 p-2 rounded-md border cursor-pointer hover:bg-accent/50 transition-colors group ${
@@ -169,14 +199,8 @@ export function L10IdsSection({
         users={users}
         open={isSheetOpen}
         onOpenChange={setIsSheetOpen}
-        onUpdate={() => {
-          onUpdate();
-          // Refresh the selected issue
-          if (selectedIssue) {
-            const updated = issues.find((i) => i.id === selectedIssue.id);
-            if (updated) setSelectedIssue(updated);
-          }
-        }}
+        onUpdate={onUpdate}
+        onOptimisticUpdate={handleIssueUpdate}
       />
     </div>
   );

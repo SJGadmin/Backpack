@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronDown,
@@ -48,10 +48,27 @@ export function L10NewTodosSection({
   const [newTodoDueDate, setNewTodoDueDate] = useState<Date | undefined>();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [localTodos, setLocalTodos] = useState<L10NewTodo[]>(todos);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
+
+  // Sync local state with props when not pending saves
+  useEffect(() => {
+    if (pendingSavesRef.current.size === 0) {
+      setLocalTodos(todos);
+    } else {
+      setLocalTodos((prev) =>
+        prev.map((t) =>
+          pendingSavesRef.current.has(t.id)
+            ? t
+            : todos.find((pt) => pt.id === t.id) || t
+        )
+      );
+    }
+  }, [todos]);
 
   // Group todos by user
   const todosByUser = users.reduce((acc, user) => {
-    acc[user.id] = todos.filter((t) => t.userId === user.id);
+    acc[user.id] = localTodos.filter((t) => t.userId === user.id);
     return acc;
   }, {} as Record<string, L10NewTodo[]>);
 
@@ -82,29 +99,69 @@ export function L10NewTodosSection({
       return;
     }
 
+    const originalTodo = localTodos.find((t) => t.id === todoId);
+    if (!originalTodo || originalTodo.text === editingText.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    // Optimistic update
+    setLocalTodos((prev) =>
+      prev.map((t) => (t.id === todoId ? { ...t, text: editingText.trim() } : t))
+    );
+    pendingSavesRef.current.add(todoId);
+    setEditingId(null);
+
     try {
       await updateNewTodo(todoId, { text: editingText.trim() });
-      setEditingId(null);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalTodos((prev) =>
+        prev.map((t) => (t.id === todoId ? { ...t, text: originalTodo.text } : t))
+      );
       toast.error('Failed to update to-do');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(todoId);
+      }, 1000);
     }
   };
 
   const handleUpdateDueDate = async (todoId: string, date: Date | null) => {
+    const originalTodo = localTodos.find((t) => t.id === todoId);
+    if (!originalTodo) return;
+
+    // Optimistic update
+    setLocalTodos((prev) =>
+      prev.map((t) => (t.id === todoId ? { ...t, dueDate: date } : t))
+    );
+    pendingSavesRef.current.add(todoId);
+
     try {
       await updateNewTodo(todoId, { dueDate: date });
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalTodos((prev) =>
+        prev.map((t) => (t.id === todoId ? { ...t, dueDate: originalTodo.dueDate } : t))
+      );
       toast.error('Failed to update due date');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(todoId);
+      }, 1000);
     }
   };
 
   const handleDeleteTodo = async (todoId: string) => {
+    // Optimistic update
+    const originalTodos = [...localTodos];
+    setLocalTodos((prev) => prev.filter((t) => t.id !== todoId));
+
     try {
       await deleteNewTodo(todoId);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalTodos(originalTodos);
       toast.error('Failed to delete to-do');
     }
   };

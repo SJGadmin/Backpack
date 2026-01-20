@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -9,6 +9,7 @@ import {
   X,
   Check,
   Ban,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ interface L10LastWeekTodosSectionProps {
   todos: L10LastWeekTodo[];
   users: UserInfo[];
   onUpdate: () => void;
+  onCarryForward?: () => void;
 }
 
 export function L10LastWeekTodosSection({
@@ -40,22 +42,40 @@ export function L10LastWeekTodosSection({
   todos,
   users,
   onUpdate,
+  onCarryForward,
 }: L10LastWeekTodosSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [newTodoUserId, setNewTodoUserId] = useState<string>('');
   const [newTodoText, setNewTodoText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [localTodos, setLocalTodos] = useState<L10LastWeekTodo[]>(todos);
+  const pendingSavesRef = useRef<Set<string>>(new Set());
+
+  // Sync local state with props when not pending saves
+  useEffect(() => {
+    if (pendingSavesRef.current.size === 0) {
+      setLocalTodos(todos);
+    } else {
+      setLocalTodos((prev) =>
+        prev.map((t) =>
+          pendingSavesRef.current.has(t.id)
+            ? t
+            : todos.find((pt) => pt.id === t.id) || t
+        )
+      );
+    }
+  }, [todos]);
 
   // Group todos by user
   const todosByUser = users.reduce((acc, user) => {
-    acc[user.id] = todos.filter((t) => t.userId === user.id);
+    acc[user.id] = localTodos.filter((t) => t.userId === user.id);
     return acc;
   }, {} as Record<string, L10LastWeekTodo[]>);
 
   // Calculate completion stats
-  const completedCount = todos.filter((t) => t.isDone).length;
-  const totalCount = todos.length;
+  const completedCount = localTodos.filter((t) => t.isDone).length;
+  const totalCount = localTodos.length;
 
   const handleAddTodo = async () => {
     if (!newTodoUserId || !newTodoText.trim()) {
@@ -73,11 +93,25 @@ export function L10LastWeekTodosSection({
   };
 
   const handleToggleDone = async (todo: L10LastWeekTodo) => {
+    // Optimistic update
+    const newStatus = !todo.isDone;
+    setLocalTodos((prev) =>
+      prev.map((t) => (t.id === todo.id ? { ...t, isDone: newStatus } : t))
+    );
+    pendingSavesRef.current.add(todo.id);
+
     try {
-      await updateLastWeekTodo(todo.id, { isDone: !todo.isDone });
-      onUpdate();
+      await updateLastWeekTodo(todo.id, { isDone: newStatus });
     } catch (error) {
+      // Revert on error
+      setLocalTodos((prev) =>
+        prev.map((t) => (t.id === todo.id ? { ...t, isDone: todo.isDone } : t))
+      );
       toast.error('Failed to update to-do');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(todo.id);
+      }, 1000);
     }
   };
 
@@ -87,53 +121,90 @@ export function L10LastWeekTodosSection({
       return;
     }
 
+    const originalTodo = localTodos.find((t) => t.id === todoId);
+    if (!originalTodo || originalTodo.text === editingText.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    // Optimistic update
+    setLocalTodos((prev) =>
+      prev.map((t) => (t.id === todoId ? { ...t, text: editingText.trim() } : t))
+    );
+    pendingSavesRef.current.add(todoId);
+    setEditingId(null);
+
     try {
       await updateLastWeekTodo(todoId, { text: editingText.trim() });
-      setEditingId(null);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalTodos((prev) =>
+        prev.map((t) => (t.id === todoId ? { ...t, text: originalTodo.text } : t))
+      );
       toast.error('Failed to update to-do');
+    } finally {
+      setTimeout(() => {
+        pendingSavesRef.current.delete(todoId);
+      }, 1000);
     }
   };
 
   const handleDeleteTodo = async (todoId: string) => {
+    // Optimistic update
+    const originalTodos = [...localTodos];
+    setLocalTodos((prev) => prev.filter((t) => t.id !== todoId));
+
     try {
       await deleteLastWeekTodo(todoId);
-      onUpdate();
     } catch (error) {
+      // Revert on error
+      setLocalTodos(originalTodos);
       toast.error('Failed to delete to-do');
     }
   };
 
   return (
     <div className="bg-card rounded-lg border">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 p-4 hover:bg-accent/50 transition-colors"
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-        <ListTodo className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">Last Week To-Dos</h2>
-        <div className="flex items-center gap-4 ml-auto">
-          <span className="flex items-center gap-1 text-sm">
-            <Check className="h-3 w-3 text-green-500" />
-            Done
-          </span>
-          <span className="flex items-center gap-1 text-sm">
-            <Ban className="h-3 w-3 text-red-500" />
-            Not Done
-          </span>
-          {totalCount > 0 && (
-            <span className="text-sm text-muted-foreground">
-              {completedCount}/{totalCount} done
-            </span>
+      <div className="flex items-center">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 flex items-center gap-2 p-4 hover:bg-accent/50 transition-colors"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
           )}
-        </div>
-      </button>
+          <ListTodo className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Last Week To-Dos</h2>
+          <div className="flex items-center gap-4 ml-auto">
+            <span className="flex items-center gap-1 text-sm">
+              <Check className="h-3 w-3 text-green-500" />
+              Done
+            </span>
+            <span className="flex items-center gap-1 text-sm">
+              <Ban className="h-3 w-3 text-red-500" />
+              Not Done
+            </span>
+            {totalCount > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {completedCount}/{totalCount} done
+              </span>
+            )}
+          </div>
+        </button>
+        {onCarryForward && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mr-2"
+            onClick={onCarryForward}
+            title="Carry forward from last meeting"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4">

@@ -24,15 +24,18 @@ import { L10NewTodosSection } from './sections/l10-new-todos-section';
 import { L10WrapSection } from './sections/l10-wrap-section';
 import { L10ParkingLotSection } from './sections/l10-parking-lot-section';
 import { L10MetricsDialog } from './l10-metrics-dialog';
+import { L10CarryForwardDialog } from './l10-carry-forward-dialog';
 
 interface L10DocumentEditorProps {
   document: L10Document;
+  folderId: string;
   users: UserInfo[];
   onUpdate: () => void;
 }
 
 export function L10DocumentEditor({
   document,
+  folderId,
   users,
   onUpdate,
 }: L10DocumentEditorProps) {
@@ -41,6 +44,7 @@ export function L10DocumentEditor({
   const [weekNumber, setWeekNumber] = useState(document.weekNumber?.toString() || '');
   const [metrics, setMetrics] = useState<L10ScorecardMetric[]>([]);
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
+  const [carryForwardMode, setCarryForwardMode] = useState<'todos' | 'rocks' | null>(null);
 
   // Update local state when document changes
   useEffect(() => {
@@ -173,6 +177,7 @@ export function L10DocumentEditor({
           rocks={document.rocks}
           users={users}
           onUpdate={onUpdate}
+          onCarryForward={() => setCarryForwardMode('rocks')}
         />
 
         {/* Last Week To-Dos Section */}
@@ -181,6 +186,7 @@ export function L10DocumentEditor({
           todos={document.lastWeekTodos}
           users={users}
           onUpdate={onUpdate}
+          onCarryForward={() => setCarryForwardMode('todos')}
         />
 
         {/* IDS Section */}
@@ -225,6 +231,16 @@ export function L10DocumentEditor({
           loadMetrics();
           onUpdate();
         }}
+      />
+
+      {/* Carry Forward Dialog */}
+      <L10CarryForwardDialog
+        open={carryForwardMode !== null}
+        onOpenChange={(open) => !open && setCarryForwardMode(null)}
+        folderId={folderId}
+        currentDocumentId={document.id}
+        mode={carryForwardMode || 'todos'}
+        onSuccess={onUpdate}
       />
     </ScrollArea>
   );
