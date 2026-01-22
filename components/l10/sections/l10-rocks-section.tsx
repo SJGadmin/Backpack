@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronRight, Target, Plus, X, Circle, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { createRock, updateRock, deleteRock } from '@/lib/actions/l10';
+import { useRocks } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10Rock, UserInfo } from '@/lib/types';
 
 interface L10RocksSectionProps {
@@ -25,7 +27,7 @@ interface L10RocksSectionProps {
 
 export function L10RocksSection({
   documentId,
-  rocks,
+  rocks: initialRocks,
   users,
   onUpdate,
   onCarryForward,
@@ -35,30 +37,29 @@ export function L10RocksSection({
   const [newRockTitle, setNewRockTitle] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [localRocks, setLocalRocks] = useState<L10Rock[]>(rocks);
-  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  // Sync local state with props when not pending saves
-  useEffect(() => {
-    if (pendingSavesRef.current.size === 0) {
-      setLocalRocks(rocks);
-    } else {
-      // Only update rocks that aren't being saved
-      setLocalRocks((prev) =>
-        prev.map((r) =>
-          pendingSavesRef.current.has(r.id)
-            ? r
-            : rocks.find((pr) => pr.id === r.id) || r
-        )
-      );
-    }
-  }, [rocks]);
+  const {
+    rocks: liveRocks,
+    updateRock: updateLiveRock,
+    addRock: addLiveRock,
+    deleteRock: deleteLiveRock,
+    setFocused,
+  } = useRocks();
+
+  // Use live rocks if available, otherwise fall back to initial
+  const rocks = liveRocks ?? initialRocks.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    title: r.title,
+    isOnTrack: r.isOnTrack,
+    orderIndex: r.orderIndex,
+  }));
 
   // Group rocks by user
   const rocksByUser = users.reduce((acc, user) => {
-    acc[user.id] = localRocks.filter((r) => r.userId === user.id);
+    acc[user.id] = rocks.filter((r) => r.userId === user.id);
     return acc;
-  }, {} as Record<string, L10Rock[]>);
+  }, {} as Record<string, typeof rocks>);
 
   const handleAddRock = async () => {
     if (!newRockUserId || !newRockTitle.trim()) {
@@ -66,35 +67,40 @@ export function L10RocksSection({
       return;
     }
 
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newRock = {
+      id: tempId,
+      userId: newRockUserId,
+      title: newRockTitle.trim(),
+      isOnTrack: true,
+      orderIndex: rocks.length,
+    };
+
+    // Add to Liveblocks immediately
+    addLiveRock(newRock);
+    setNewRockTitle('');
+
     try {
       await createRock(documentId, newRockUserId, newRockTitle.trim());
-      setNewRockTitle('');
-      onUpdate();
+      onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add rock');
+      deleteLiveRock(tempId); // Remove optimistic update on error
     }
   };
 
-  const handleToggleStatus = async (rock: L10Rock) => {
-    // Optimistic update
+  const handleToggleStatus = async (rock: typeof rocks[0]) => {
     const newStatus = !rock.isOnTrack;
-    setLocalRocks((prev) =>
-      prev.map((r) => (r.id === rock.id ? { ...r, isOnTrack: newStatus } : r))
-    );
-    pendingSavesRef.current.add(rock.id);
+    // Update Liveblocks immediately
+    updateLiveRock(rock.id, { isOnTrack: newStatus });
 
     try {
       await updateRock(rock.id, { isOnTrack: newStatus });
     } catch (error) {
       // Revert on error
-      setLocalRocks((prev) =>
-        prev.map((r) => (r.id === rock.id ? { ...r, isOnTrack: rock.isOnTrack } : r))
-      );
+      updateLiveRock(rock.id, { isOnTrack: rock.isOnTrack });
       toast.error('Failed to update rock status');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(rock.id);
-      }, 1000);
     }
   };
 
@@ -104,47 +110,43 @@ export function L10RocksSection({
       return;
     }
 
-    const originalRock = localRocks.find((r) => r.id === rockId);
+    const originalRock = rocks.find((r) => r.id === rockId);
     if (!originalRock || originalRock.title === editingTitle.trim()) {
       setEditingId(null);
       return;
     }
 
-    // Optimistic update
-    setLocalRocks((prev) =>
-      prev.map((r) => (r.id === rockId ? { ...r, title: editingTitle.trim() } : r))
-    );
-    pendingSavesRef.current.add(rockId);
+    // Update Liveblocks immediately
+    updateLiveRock(rockId, { title: editingTitle.trim() });
     setEditingId(null);
 
     try {
       await updateRock(rockId, { title: editingTitle.trim() });
     } catch (error) {
       // Revert on error
-      setLocalRocks((prev) =>
-        prev.map((r) => (r.id === rockId ? { ...r, title: originalRock.title } : r))
-      );
+      updateLiveRock(rockId, { title: originalRock.title });
       toast.error('Failed to update rock');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(rockId);
-      }, 1000);
     }
   };
 
   const handleDeleteRock = async (rockId: string) => {
-    // Optimistic update
-    const originalRocks = [...localRocks];
-    setLocalRocks((prev) => prev.filter((r) => r.id !== rockId));
+    const originalRock = rocks.find((r) => r.id === rockId);
+    // Delete from Liveblocks immediately
+    deleteLiveRock(rockId);
 
     try {
       await deleteRock(rockId);
     } catch (error) {
       // Revert on error
-      setLocalRocks(originalRocks);
+      if (originalRock) {
+        addLiveRock(originalRock);
+      }
       toast.error('Failed to delete rock');
     }
   };
+
+  const handleFocus = () => setFocused(true);
+  const handleBlurFocus = () => setFocused(false);
 
   return (
     <div className="bg-card rounded-lg border">
@@ -163,6 +165,7 @@ export function L10RocksSection({
           <span className="text-sm text-muted-foreground ml-2">
             (Quarterly goals)
           </span>
+          <L10SectionPresence section="Rocks" />
           <div className="flex items-center gap-4 ml-auto">
             <span className="flex items-center gap-1 text-sm">
               <Circle className="h-3 w-3 fill-green-500 text-green-500" />
@@ -216,7 +219,11 @@ export function L10RocksSection({
                       <Input
                         value={editingTitle}
                         onChange={(e) => setEditingTitle(e.target.value)}
-                        onBlur={() => handleSaveTitle(rock.id)}
+                        onFocus={handleFocus}
+                        onBlur={() => {
+                          handleSaveTitle(rock.id);
+                          handleBlurFocus();
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveTitle(rock.id);
                           if (e.key === 'Escape') setEditingId(null);
@@ -264,6 +271,8 @@ export function L10RocksSection({
             <Input
               value={newRockTitle}
               onChange={(e) => setNewRockTitle(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlurFocus}
               placeholder="Rock title"
               className="flex-1"
               onKeyDown={(e) => {

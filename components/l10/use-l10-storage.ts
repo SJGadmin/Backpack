@@ -19,6 +19,17 @@ export function useSegueEntries() {
     []
   );
 
+  const updateEntryByUserId = useMutation(
+    ({ storage }, userId: string, text: string) => {
+      const entries = storage.get('segueEntries');
+      const index = entries.findIndex((e: any) => e.userId === userId);
+      if (index !== -1) {
+        entries[index] = { ...entries[index], text };
+      }
+    },
+    []
+  );
+
   const setFocused = useCallback(
     (focused: boolean) => {
       updatePresence({ focusedSection: focused ? 'Segue' : null });
@@ -26,7 +37,7 @@ export function useSegueEntries() {
     [updatePresence]
   );
 
-  return { entries, updateEntry, setFocused };
+  return { entries, updateEntry, updateEntryByUserId, setFocused };
 }
 
 // Hook for real-time scorecard rows
@@ -45,6 +56,17 @@ export function useScorecardRows() {
     []
   );
 
+  const updateRowByMetricId = useMutation(
+    ({ storage }, metricId: string, value: number | null) => {
+      const rows = storage.get('scorecardRows');
+      const index = rows.findIndex((r: any) => r.metricId === metricId);
+      if (index !== -1) {
+        rows[index] = { ...rows[index], value };
+      }
+    },
+    []
+  );
+
   const setFocused = useCallback(
     (focused: boolean) => {
       updatePresence({ focusedSection: focused ? 'Scorecard' : null });
@@ -52,7 +74,7 @@ export function useScorecardRows() {
     [updatePresence]
   );
 
-  return { rows, updateRow, setFocused };
+  return { rows, updateRow, updateRowByMetricId, setFocused };
 }
 
 // Hook for real-time rocks

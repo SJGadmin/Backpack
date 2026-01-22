@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -20,6 +20,8 @@ import {
   deleteWrapFeedback,
   upsertWrapScore,
 } from '@/lib/actions/l10';
+import { useWrapFeedback, useWrapScores } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10WrapFeedback, L10WrapScore, UserInfo } from '@/lib/types';
 
 interface L10WrapSectionProps {
@@ -32,8 +34,8 @@ interface L10WrapSectionProps {
 
 export function L10WrapSection({
   documentId,
-  feedback,
-  scores,
+  feedback: initialFeedback,
+  scores: initialScores,
   users,
   onUpdate,
 }: L10WrapSectionProps) {
@@ -42,38 +44,43 @@ export function L10WrapSection({
   const [newSucked, setNewSucked] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-  const [localFeedback, setLocalFeedback] = useState<L10WrapFeedback[]>(feedback);
-  const [localScores, setLocalScores] = useState<L10WrapScore[]>(scores);
-  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  // Sync local state with props when not pending saves
-  useEffect(() => {
-    if (pendingSavesRef.current.size === 0) {
-      setLocalFeedback(feedback);
-    } else {
-      setLocalFeedback((prev) =>
-        prev.map((f) =>
-          pendingSavesRef.current.has(f.id)
-            ? f
-            : feedback.find((pf) => pf.id === f.id) || f
-        )
-      );
-    }
-  }, [feedback]);
+  const {
+    feedback: liveFeedback,
+    updateFeedback: updateLiveFeedback,
+    addFeedback: addLiveFeedback,
+    deleteFeedback: deleteLiveFeedback,
+    setFocused,
+  } = useWrapFeedback();
 
-  useEffect(() => {
-    if (pendingSavesRef.current.size === 0) {
-      setLocalScores(scores);
-    }
-  }, [scores]);
+  const {
+    scores: liveScores,
+    updateScore: updateLiveScore,
+    addScore: addLiveScore,
+  } = useWrapScores();
 
-  const workedFeedback = localFeedback.filter((f) => f.type === 'worked');
-  const suckedFeedback = localFeedback.filter((f) => f.type === 'sucked');
+  // Use live data if available, otherwise fall back to initial
+  const feedback = liveFeedback ?? initialFeedback.map((f) => ({
+    id: f.id,
+    type: f.type as 'positive' | 'negative',
+    text: f.text,
+    orderIndex: f.orderIndex,
+  }));
+
+  const scores = liveScores ?? initialScores.map((s) => ({
+    id: s.id,
+    userId: s.userId,
+    score: s.score,
+  }));
+
+  // Map 'worked'/'sucked' to 'positive'/'negative' for filtering
+  const workedFeedback = feedback.filter((f) => f.type === 'positive' || (f as any).type === 'worked');
+  const suckedFeedback = feedback.filter((f) => f.type === 'negative' || (f as any).type === 'sucked');
 
   // Calculate average score
   const avgScore =
-    localScores.length > 0
-      ? (localScores.reduce((sum, s) => sum + s.score, 0) / localScores.length).toFixed(1)
+    scores.length > 0
+      ? (scores.reduce((sum, s) => sum + s.score, 0) / scores.length).toFixed(1)
       : '-';
 
   const handleAddFeedback = async (type: 'worked' | 'sucked') => {
@@ -83,16 +90,30 @@ export function L10WrapSection({
       return;
     }
 
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const liveType = type === 'worked' ? 'positive' : 'negative';
+    const newFeedbackItem = {
+      id: tempId,
+      type: liveType as 'positive' | 'negative',
+      text: text.trim(),
+      orderIndex: feedback.length,
+    };
+
+    // Add to Liveblocks immediately
+    addLiveFeedback(newFeedbackItem);
+    if (type === 'worked') {
+      setNewWorked('');
+    } else {
+      setNewSucked('');
+    }
+
     try {
       await createWrapFeedback(documentId, type, text.trim());
-      if (type === 'worked') {
-        setNewWorked('');
-      } else {
-        setNewSucked('');
-      }
-      onUpdate();
+      onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add feedback');
+      deleteLiveFeedback(tempId); // Remove optimistic update on error
     }
   };
 
@@ -102,44 +123,37 @@ export function L10WrapSection({
       return;
     }
 
-    const originalFeedback = localFeedback.find((f) => f.id === feedbackId);
+    const originalFeedback = feedback.find((f) => f.id === feedbackId);
     if (!originalFeedback || originalFeedback.text === editingText.trim()) {
       setEditingId(null);
       return;
     }
 
-    // Optimistic update
-    setLocalFeedback((prev) =>
-      prev.map((f) => (f.id === feedbackId ? { ...f, text: editingText.trim() } : f))
-    );
-    pendingSavesRef.current.add(feedbackId);
+    // Update Liveblocks immediately
+    updateLiveFeedback(feedbackId, editingText.trim());
     setEditingId(null);
 
     try {
       await updateWrapFeedback(feedbackId, editingText.trim());
     } catch (error) {
       // Revert on error
-      setLocalFeedback((prev) =>
-        prev.map((f) => (f.id === feedbackId ? { ...f, text: originalFeedback.text } : f))
-      );
+      updateLiveFeedback(feedbackId, originalFeedback.text);
       toast.error('Failed to update feedback');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(feedbackId);
-      }, 1000);
     }
   };
 
   const handleDeleteFeedback = async (feedbackId: string) => {
-    // Optimistic update
-    const originalFeedback = [...localFeedback];
-    setLocalFeedback((prev) => prev.filter((f) => f.id !== feedbackId));
+    const originalFeedback = feedback.find((f) => f.id === feedbackId);
+    // Delete from Liveblocks immediately
+    deleteLiveFeedback(feedbackId);
 
     try {
       await deleteWrapFeedback(feedbackId);
     } catch (error) {
       // Revert on error
-      setLocalFeedback(originalFeedback);
+      if (originalFeedback) {
+        addLiveFeedback(originalFeedback);
+      }
       toast.error('Failed to delete feedback');
     }
   };
@@ -147,39 +161,33 @@ export function L10WrapSection({
   const handleScoreChange = async (userId: string, score: number) => {
     if (score < 1 || score > 10) return;
 
-    // Optimistic update
-    const existingScoreIndex = localScores.findIndex((s) => s.userId === userId);
-    const previousScores = [...localScores];
+    const existingScore = scores.find((s) => s.userId === userId);
 
-    if (existingScoreIndex >= 0) {
-      setLocalScores((prev) =>
-        prev.map((s) => (s.userId === userId ? { ...s, score } : s))
-      );
+    if (existingScore) {
+      // Update Liveblocks immediately
+      updateLiveScore(existingScore.id, score);
     } else {
-      setLocalScores((prev) => [
-        ...prev,
-        { id: `temp-${userId}`, documentId, userId, score } as L10WrapScore,
-      ]);
+      // Add new score to Liveblocks
+      const tempId = `temp-${userId}`;
+      addLiveScore({ id: tempId, userId, score });
     }
-    pendingSavesRef.current.add(`score-${userId}`);
 
     try {
       await upsertWrapScore(documentId, userId, score);
+      onUpdate(); // Refresh to get the real ID if new
     } catch (error) {
-      // Revert on error
-      setLocalScores(previousScores);
+      // Revert on error - scores will be refreshed from server
       toast.error('Failed to update score');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(`score-${userId}`);
-      }, 1000);
     }
   };
 
   const getScore = (userId: string) => {
-    const score = localScores.find((s) => s.userId === userId);
+    const score = scores.find((s) => s.userId === userId);
     return score?.score || '';
   };
+
+  const handleFocus = () => setFocused(true);
+  const handleBlurFocus = () => setFocused(false);
 
   return (
     <div className="bg-card rounded-lg border">
@@ -194,7 +202,8 @@ export function L10WrapSection({
         )}
         <Sparkles className="h-4 w-4 text-primary" />
         <h2 className="font-semibold">Wrap</h2>
-        {localScores.length > 0 && (
+        <L10SectionPresence section="Wrap" />
+        {scores.length > 0 && (
           <span className="text-sm text-muted-foreground ml-auto">
             Avg score: {avgScore}
           </span>
@@ -217,7 +226,11 @@ export function L10WrapSection({
                     <Input
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      onBlur={() => handleSaveFeedback(item.id)}
+                      onFocus={handleFocus}
+                      onBlur={() => {
+                        handleSaveFeedback(item.id);
+                        handleBlurFocus();
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSaveFeedback(item.id);
                         if (e.key === 'Escape') setEditingId(null);
@@ -249,6 +262,8 @@ export function L10WrapSection({
               <Input
                 value={newWorked}
                 onChange={(e) => setNewWorked(e.target.value)}
+                onFocus={handleFocus}
+                onBlur={handleBlurFocus}
                 placeholder="Add what worked..."
                 className="flex-1"
                 onKeyDown={(e) => {
@@ -275,7 +290,11 @@ export function L10WrapSection({
                     <Input
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      onBlur={() => handleSaveFeedback(item.id)}
+                      onFocus={handleFocus}
+                      onBlur={() => {
+                        handleSaveFeedback(item.id);
+                        handleBlurFocus();
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSaveFeedback(item.id);
                         if (e.key === 'Escape') setEditingId(null);
@@ -307,6 +326,8 @@ export function L10WrapSection({
               <Input
                 value={newSucked}
                 onChange={(e) => setNewSucked(e.target.value)}
+                onFocus={handleFocus}
+                onBlur={handleBlurFocus}
                 placeholder="Add what sucked..."
                 className="flex-1"
                 onKeyDown={(e) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronDown,
@@ -27,6 +27,8 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { createNewTodo, updateNewTodo, deleteNewTodo } from '@/lib/actions/l10';
+import { useNewTodos } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10NewTodo, UserInfo } from '@/lib/types';
 
 interface L10NewTodosSectionProps {
@@ -38,7 +40,7 @@ interface L10NewTodosSectionProps {
 
 export function L10NewTodosSection({
   documentId,
-  todos,
+  todos: initialTodos,
   users,
   onUpdate,
 }: L10NewTodosSectionProps) {
@@ -48,35 +50,50 @@ export function L10NewTodosSection({
   const [newTodoDueDate, setNewTodoDueDate] = useState<Date | undefined>();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-  const [localTodos, setLocalTodos] = useState<L10NewTodo[]>(todos);
-  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  // Sync local state with props when not pending saves
-  useEffect(() => {
-    if (pendingSavesRef.current.size === 0) {
-      setLocalTodos(todos);
-    } else {
-      setLocalTodos((prev) =>
-        prev.map((t) =>
-          pendingSavesRef.current.has(t.id)
-            ? t
-            : todos.find((pt) => pt.id === t.id) || t
-        )
-      );
-    }
-  }, [todos]);
+  const {
+    todos: liveTodos,
+    updateTodo: updateLiveTodo,
+    addTodo: addLiveTodo,
+    deleteTodo: deleteLiveTodo,
+    setFocused,
+  } = useNewTodos();
+
+  // Use live todos if available, otherwise fall back to initial
+  const todos = liveTodos ?? initialTodos.map((t) => ({
+    id: t.id,
+    userId: t.userId,
+    text: t.text,
+    dueDate: t.dueDate ? t.dueDate.toString() : null,
+    orderIndex: t.orderIndex,
+  }));
 
   // Group todos by user
   const todosByUser = users.reduce((acc, user) => {
-    acc[user.id] = localTodos.filter((t) => t.userId === user.id);
+    acc[user.id] = todos.filter((t) => t.userId === user.id);
     return acc;
-  }, {} as Record<string, L10NewTodo[]>);
+  }, {} as Record<string, typeof todos>);
 
   const handleAddTodo = async () => {
     if (!newTodoUserId || !newTodoText.trim()) {
       toast.error('Please select a user and enter a to-do');
       return;
     }
+
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newTodo = {
+      id: tempId,
+      userId: newTodoUserId,
+      text: newTodoText.trim(),
+      dueDate: newTodoDueDate ? newTodoDueDate.toISOString() : null,
+      orderIndex: todos.length,
+    };
+
+    // Add to Liveblocks immediately
+    addLiveTodo(newTodo);
+    setNewTodoText('');
+    setNewTodoDueDate(undefined);
 
     try {
       await createNewTodo(
@@ -85,11 +102,10 @@ export function L10NewTodosSection({
         newTodoText.trim(),
         newTodoDueDate
       );
-      setNewTodoText('');
-      setNewTodoDueDate(undefined);
-      onUpdate();
+      onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add to-do');
+      deleteLiveTodo(tempId); // Remove optimistic update on error
     }
   };
 
@@ -99,72 +115,60 @@ export function L10NewTodosSection({
       return;
     }
 
-    const originalTodo = localTodos.find((t) => t.id === todoId);
+    const originalTodo = todos.find((t) => t.id === todoId);
     if (!originalTodo || originalTodo.text === editingText.trim()) {
       setEditingId(null);
       return;
     }
 
-    // Optimistic update
-    setLocalTodos((prev) =>
-      prev.map((t) => (t.id === todoId ? { ...t, text: editingText.trim() } : t))
-    );
-    pendingSavesRef.current.add(todoId);
+    // Update Liveblocks immediately
+    updateLiveTodo(todoId, { text: editingText.trim() });
     setEditingId(null);
 
     try {
       await updateNewTodo(todoId, { text: editingText.trim() });
     } catch (error) {
       // Revert on error
-      setLocalTodos((prev) =>
-        prev.map((t) => (t.id === todoId ? { ...t, text: originalTodo.text } : t))
-      );
+      updateLiveTodo(todoId, { text: originalTodo.text });
       toast.error('Failed to update to-do');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(todoId);
-      }, 1000);
     }
   };
 
   const handleUpdateDueDate = async (todoId: string, date: Date | null) => {
-    const originalTodo = localTodos.find((t) => t.id === todoId);
+    const originalTodo = todos.find((t) => t.id === todoId);
     if (!originalTodo) return;
 
-    // Optimistic update
-    setLocalTodos((prev) =>
-      prev.map((t) => (t.id === todoId ? { ...t, dueDate: date } : t))
-    );
-    pendingSavesRef.current.add(todoId);
+    const dateStr = date ? date.toISOString() : null;
+    // Update Liveblocks immediately
+    updateLiveTodo(todoId, { dueDate: dateStr });
 
     try {
       await updateNewTodo(todoId, { dueDate: date });
     } catch (error) {
       // Revert on error
-      setLocalTodos((prev) =>
-        prev.map((t) => (t.id === todoId ? { ...t, dueDate: originalTodo.dueDate } : t))
-      );
+      updateLiveTodo(todoId, { dueDate: originalTodo.dueDate });
       toast.error('Failed to update due date');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(todoId);
-      }, 1000);
     }
   };
 
   const handleDeleteTodo = async (todoId: string) => {
-    // Optimistic update
-    const originalTodos = [...localTodos];
-    setLocalTodos((prev) => prev.filter((t) => t.id !== todoId));
+    const originalTodo = todos.find((t) => t.id === todoId);
+    // Delete from Liveblocks immediately
+    deleteLiveTodo(todoId);
 
     try {
       await deleteNewTodo(todoId);
     } catch (error) {
       // Revert on error
-      setLocalTodos(originalTodos);
+      if (originalTodo) {
+        addLiveTodo(originalTodo);
+      }
       toast.error('Failed to delete to-do');
     }
   };
+
+  const handleFocus = () => setFocused(true);
+  const handleBlurFocus = () => setFocused(false);
 
   return (
     <div className="bg-card rounded-lg border">
@@ -182,6 +186,7 @@ export function L10NewTodosSection({
         <span className="text-sm text-muted-foreground ml-2">
           (From today)
         </span>
+        <L10SectionPresence section="New Todos" />
       </button>
 
       {isExpanded && (
@@ -207,7 +212,11 @@ export function L10NewTodosSection({
                       <Input
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        onBlur={() => handleSaveText(todo.id)}
+                        onFocus={handleFocus}
+                        onBlur={() => {
+                          handleSaveText(todo.id);
+                          handleBlurFocus();
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveText(todo.id);
                           if (e.key === 'Escape') setEditingId(null);
@@ -293,6 +302,8 @@ export function L10NewTodosSection({
             <Input
               value={newTodoText}
               onChange={(e) => setNewTodoText(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlurFocus}
               placeholder="To-do item"
               className="flex-1"
               onKeyDown={(e) => {

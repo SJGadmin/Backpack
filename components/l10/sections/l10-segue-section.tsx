@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { updateSegueEntry } from '@/lib/actions/l10';
+import { useSegueEntries } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10SegueEntry, UserInfo } from '@/lib/types';
 
 interface L10SegueSectionProps {
@@ -15,67 +17,49 @@ interface L10SegueSectionProps {
 
 export function L10SegueSection({
   documentId,
-  entries,
+  entries: initialEntries,
   users,
 }: L10SegueSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [localEntries, setLocalEntries] = useState<Record<string, string>>({});
-  const initializedRef = useRef(false);
-  const pendingSavesRef = useRef<Set<string>>(new Set());
+  const { entries: liveEntries, updateEntryByUserId, setFocused } = useSegueEntries();
 
-  // Initialize local state from props only once or when documentId changes
-  useEffect(() => {
-    if (!initializedRef.current || pendingSavesRef.current.size === 0) {
-      const entriesMap: Record<string, string> = {};
-      entries.forEach((e) => {
-        // Only update if not currently being edited
-        if (!pendingSavesRef.current.has(e.userId)) {
-          entriesMap[e.userId] = e.text;
-        }
-      });
-      setLocalEntries((prev) => ({
-        ...prev,
-        ...entriesMap,
-      }));
-      initializedRef.current = true;
-    }
-  }, [entries]);
+  // Use live entries if available, otherwise fall back to initial
+  const entries = liveEntries ?? initialEntries.map((e) => ({
+    id: e.id,
+    userId: e.userId,
+    text: e.text,
+    orderIndex: e.orderIndex,
+  }));
 
-  // Reset when document changes
-  useEffect(() => {
-    initializedRef.current = false;
-    pendingSavesRef.current.clear();
-    const entriesMap: Record<string, string> = {};
-    entries.forEach((e) => {
-      entriesMap[e.userId] = e.text;
-    });
-    setLocalEntries(entriesMap);
-  }, [documentId]);
+  const getEntryText = useCallback(
+    (userId: string) => {
+      const entry = entries?.find((e) => e.userId === userId);
+      return entry?.text ?? '';
+    },
+    [entries]
+  );
 
   const handleChange = (userId: string, text: string) => {
-    setLocalEntries((prev) => ({ ...prev, [userId]: text }));
+    // Update Liveblocks storage immediately for real-time sync
+    updateEntryByUserId(userId, text);
   };
 
   const handleBlur = async (userId: string) => {
-    const text = localEntries[userId] ?? '';
-    const existingEntry = entries.find((e) => e.userId === userId);
-
-    // Skip if no change
-    if (existingEntry?.text === text) return;
-
-    // Mark as pending save to prevent overwrite from props
-    pendingSavesRef.current.add(userId);
-
+    const text = getEntryText(userId);
+    // Also persist to database
     try {
       await updateSegueEntry(documentId, userId, text);
     } catch (error) {
-      console.error('Failed to update segue entry:', error);
-    } finally {
-      // Clear pending after a delay to allow for any prop updates to settle
-      setTimeout(() => {
-        pendingSavesRef.current.delete(userId);
-      }, 1000);
+      console.error('Failed to persist segue entry:', error);
     }
+  };
+
+  const handleFocus = () => {
+    setFocused(true);
+  };
+
+  const handleBlurFocus = () => {
+    setFocused(false);
   };
 
   return (
@@ -94,6 +78,7 @@ export function L10SegueSection({
         <span className="text-sm text-muted-foreground ml-2">
           (Quick check-in. No rabbit holes.)
         </span>
+        <L10SectionPresence section="Segue" />
       </button>
 
       {isExpanded && (
@@ -104,9 +89,13 @@ export function L10SegueSection({
                 <span className="text-sm font-medium">{user.name}</span>
               </div>
               <Textarea
-                value={localEntries[user.id] ?? ''}
+                value={getEntryText(user.id)}
                 onChange={(e) => handleChange(user.id, e.target.value)}
-                onBlur={() => handleBlur(user.id)}
+                onFocus={handleFocus}
+                onBlur={() => {
+                  handleBlur(user.id);
+                  handleBlurFocus();
+                }}
                 placeholder="What's on your mind?"
                 className="min-h-[60px] resize-none"
               />

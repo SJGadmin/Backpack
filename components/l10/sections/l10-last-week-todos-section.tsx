@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -27,6 +27,8 @@ import {
   updateLastWeekTodo,
   deleteLastWeekTodo,
 } from '@/lib/actions/l10';
+import { useLastWeekTodos } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10LastWeekTodo, UserInfo } from '@/lib/types';
 
 interface L10LastWeekTodosSectionProps {
@@ -39,7 +41,7 @@ interface L10LastWeekTodosSectionProps {
 
 export function L10LastWeekTodosSection({
   documentId,
-  todos,
+  todos: initialTodos,
   users,
   onUpdate,
   onCarryForward,
@@ -49,33 +51,33 @@ export function L10LastWeekTodosSection({
   const [newTodoText, setNewTodoText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-  const [localTodos, setLocalTodos] = useState<L10LastWeekTodo[]>(todos);
-  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  // Sync local state with props when not pending saves
-  useEffect(() => {
-    if (pendingSavesRef.current.size === 0) {
-      setLocalTodos(todos);
-    } else {
-      setLocalTodos((prev) =>
-        prev.map((t) =>
-          pendingSavesRef.current.has(t.id)
-            ? t
-            : todos.find((pt) => pt.id === t.id) || t
-        )
-      );
-    }
-  }, [todos]);
+  const {
+    todos: liveTodos,
+    updateTodo: updateLiveTodo,
+    addTodo: addLiveTodo,
+    deleteTodo: deleteLiveTodo,
+    setFocused,
+  } = useLastWeekTodos();
+
+  // Use live todos if available, otherwise fall back to initial
+  const todos = liveTodos ?? initialTodos.map((t) => ({
+    id: t.id,
+    userId: t.userId,
+    text: t.text,
+    isDone: t.isDone,
+    orderIndex: t.orderIndex,
+  }));
 
   // Group todos by user
   const todosByUser = users.reduce((acc, user) => {
-    acc[user.id] = localTodos.filter((t) => t.userId === user.id);
+    acc[user.id] = todos.filter((t) => t.userId === user.id);
     return acc;
-  }, {} as Record<string, L10LastWeekTodo[]>);
+  }, {} as Record<string, typeof todos>);
 
   // Calculate completion stats
-  const completedCount = localTodos.filter((t) => t.isDone).length;
-  const totalCount = localTodos.length;
+  const completedCount = todos.filter((t) => t.isDone).length;
+  const totalCount = todos.length;
 
   const handleAddTodo = async () => {
     if (!newTodoUserId || !newTodoText.trim()) {
@@ -83,35 +85,40 @@ export function L10LastWeekTodosSection({
       return;
     }
 
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newTodo = {
+      id: tempId,
+      userId: newTodoUserId,
+      text: newTodoText.trim(),
+      isDone: false,
+      orderIndex: todos.length,
+    };
+
+    // Add to Liveblocks immediately
+    addLiveTodo(newTodo);
+    setNewTodoText('');
+
     try {
       await createLastWeekTodo(documentId, newTodoUserId, newTodoText.trim());
-      setNewTodoText('');
-      onUpdate();
+      onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add to-do');
+      deleteLiveTodo(tempId); // Remove optimistic update on error
     }
   };
 
-  const handleToggleDone = async (todo: L10LastWeekTodo) => {
-    // Optimistic update
+  const handleToggleDone = async (todo: typeof todos[0]) => {
     const newStatus = !todo.isDone;
-    setLocalTodos((prev) =>
-      prev.map((t) => (t.id === todo.id ? { ...t, isDone: newStatus } : t))
-    );
-    pendingSavesRef.current.add(todo.id);
+    // Update Liveblocks immediately
+    updateLiveTodo(todo.id, { isDone: newStatus });
 
     try {
       await updateLastWeekTodo(todo.id, { isDone: newStatus });
     } catch (error) {
       // Revert on error
-      setLocalTodos((prev) =>
-        prev.map((t) => (t.id === todo.id ? { ...t, isDone: todo.isDone } : t))
-      );
+      updateLiveTodo(todo.id, { isDone: todo.isDone });
       toast.error('Failed to update to-do');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(todo.id);
-      }, 1000);
     }
   };
 
@@ -121,47 +128,43 @@ export function L10LastWeekTodosSection({
       return;
     }
 
-    const originalTodo = localTodos.find((t) => t.id === todoId);
+    const originalTodo = todos.find((t) => t.id === todoId);
     if (!originalTodo || originalTodo.text === editingText.trim()) {
       setEditingId(null);
       return;
     }
 
-    // Optimistic update
-    setLocalTodos((prev) =>
-      prev.map((t) => (t.id === todoId ? { ...t, text: editingText.trim() } : t))
-    );
-    pendingSavesRef.current.add(todoId);
+    // Update Liveblocks immediately
+    updateLiveTodo(todoId, { text: editingText.trim() });
     setEditingId(null);
 
     try {
       await updateLastWeekTodo(todoId, { text: editingText.trim() });
     } catch (error) {
       // Revert on error
-      setLocalTodos((prev) =>
-        prev.map((t) => (t.id === todoId ? { ...t, text: originalTodo.text } : t))
-      );
+      updateLiveTodo(todoId, { text: originalTodo.text });
       toast.error('Failed to update to-do');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(todoId);
-      }, 1000);
     }
   };
 
   const handleDeleteTodo = async (todoId: string) => {
-    // Optimistic update
-    const originalTodos = [...localTodos];
-    setLocalTodos((prev) => prev.filter((t) => t.id !== todoId));
+    const originalTodo = todos.find((t) => t.id === todoId);
+    // Delete from Liveblocks immediately
+    deleteLiveTodo(todoId);
 
     try {
       await deleteLastWeekTodo(todoId);
     } catch (error) {
       // Revert on error
-      setLocalTodos(originalTodos);
+      if (originalTodo) {
+        addLiveTodo(originalTodo);
+      }
       toast.error('Failed to delete to-do');
     }
   };
+
+  const handleFocus = () => setFocused(true);
+  const handleBlurFocus = () => setFocused(false);
 
   return (
     <div className="bg-card rounded-lg border">
@@ -177,6 +180,7 @@ export function L10LastWeekTodosSection({
           )}
           <ListTodo className="h-4 w-4 text-primary" />
           <h2 className="font-semibold">Last Week To-Dos</h2>
+          <L10SectionPresence section="Last Week Todos" />
           <div className="flex items-center gap-4 ml-auto">
             <span className="flex items-center gap-1 text-sm">
               <Check className="h-3 w-3 text-green-500" />
@@ -232,7 +236,11 @@ export function L10LastWeekTodosSection({
                       <Input
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
-                        onBlur={() => handleSaveText(todo.id)}
+                        onFocus={handleFocus}
+                        onBlur={() => {
+                          handleSaveText(todo.id);
+                          handleBlurFocus();
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveText(todo.id);
                           if (e.key === 'Escape') setEditingId(null);
@@ -284,6 +292,8 @@ export function L10LastWeekTodosSection({
             <Input
               value={newTodoText}
               onChange={(e) => setNewTodoText(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlurFocus}
               placeholder="To-do item"
               className="flex-1"
               onKeyDown={(e) => {

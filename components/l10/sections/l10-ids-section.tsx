@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronDown,
@@ -17,6 +17,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { createIdsIssue, deleteIdsIssue } from '@/lib/actions/l10';
+import { useIdsIssues } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10IdsIssue, UserInfo } from '@/lib/types';
 import { L10IdsIssueSheet } from './l10-ids-issue-sheet';
 
@@ -29,7 +31,7 @@ interface L10IdsSectionProps {
 
 export function L10IdsSection({
   documentId,
-  issues,
+  issues: initialIssues,
   users,
   onUpdate,
 }: L10IdsSectionProps) {
@@ -37,19 +39,44 @@ export function L10IdsSection({
   const [newIssueTitle, setNewIssueTitle] = useState('');
   const [selectedIssue, setSelectedIssue] = useState<L10IdsIssue | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [localIssues, setLocalIssues] = useState<L10IdsIssue[]>(issues);
-  const pendingDeletesRef = useRef<Set<string>>(new Set());
 
-  // Sync local state with props
-  useEffect(() => {
-    // Filter out pending deletes but keep other updates
-    setLocalIssues(issues.filter((i) => !pendingDeletesRef.current.has(i.id)));
-    // Update selected issue if it was updated
-    if (selectedIssue) {
-      const updated = issues.find((i) => i.id === selectedIssue.id);
-      if (updated) setSelectedIssue(updated);
-    }
-  }, [issues]);
+  const {
+    issues: liveIssues,
+    updateIssue: updateLiveIssue,
+    addIssue: addLiveIssue,
+    deleteIssue: deleteLiveIssue,
+    setFocused,
+  } = useIdsIssues();
+
+  // Use live issues if available, otherwise fall back to initial
+  // Note: We need to merge with initialIssues to get the owner object and issueNumber
+  // Convert live issues (string dueDate) to L10IdsIssue format (Date dueDate)
+  const issues: L10IdsIssue[] = liveIssues
+    ? liveIssues.map((li) => {
+        const initial = initialIssues.find((i) => i.id === li.id);
+        return {
+          id: li.id,
+          documentId: initial?.documentId ?? documentId,
+          issueNumber: initial?.issueNumber ?? 0,
+          title: li.title,
+          identify: li.identify,
+          discuss: li.discuss,
+          solve: li.solve,
+          ownerId: li.ownerId,
+          owner: li.ownerId ? users.find((u) => u.id === li.ownerId) ?? null : null,
+          dueDate: li.dueDate ? new Date(li.dueDate) : null,
+          isResolved: li.isResolved,
+          orderIndex: li.orderIndex,
+          createdAt: initial?.createdAt ?? new Date(),
+          updatedAt: initial?.updatedAt ?? new Date(),
+        };
+      })
+    : initialIssues;
+
+  // Update selected issue when live data changes
+  const currentSelectedIssue = selectedIssue
+    ? issues.find((i) => i.id === selectedIssue.id) ?? selectedIssue
+    : null;
 
   const handleAddIssue = async () => {
     if (!newIssueTitle.trim()) {
@@ -57,31 +84,46 @@ export function L10IdsSection({
       return;
     }
 
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newIssue = {
+      id: tempId,
+      title: newIssueTitle.trim(),
+      identify: null,
+      discuss: null,
+      solve: null,
+      ownerId: null,
+      dueDate: null,
+      isResolved: false,
+      orderIndex: issues.length,
+    };
+
+    // Add to Liveblocks immediately
+    addLiveIssue(newIssue);
+    setNewIssueTitle('');
+
     try {
       await createIdsIssue(documentId, newIssueTitle.trim());
-      setNewIssueTitle('');
-      onUpdate();
+      onUpdate(); // Refresh to get the real ID and issueNumber
     } catch (error) {
       toast.error('Failed to add issue');
+      deleteLiveIssue(tempId); // Remove optimistic update on error
     }
   };
 
   const handleDeleteIssue = async (issueId: string) => {
-    // Optimistic update
-    const originalIssues = [...localIssues];
-    setLocalIssues((prev) => prev.filter((i) => i.id !== issueId));
-    pendingDeletesRef.current.add(issueId);
+    const originalIssue = liveIssues?.find((i) => i.id === issueId);
+    // Delete from Liveblocks immediately
+    deleteLiveIssue(issueId);
 
     try {
       await deleteIdsIssue(issueId);
     } catch (error) {
       // Revert on error
-      setLocalIssues(originalIssues);
+      if (originalIssue) {
+        addLiveIssue(originalIssue);
+      }
       toast.error('Failed to delete issue');
-    } finally {
-      setTimeout(() => {
-        pendingDeletesRef.current.delete(issueId);
-      }, 1000);
     }
   };
 
@@ -91,11 +133,21 @@ export function L10IdsSection({
   };
 
   const handleIssueUpdate = (updatedIssue: L10IdsIssue) => {
-    setLocalIssues((prev) =>
-      prev.map((i) => (i.id === updatedIssue.id ? updatedIssue : i))
-    );
+    // Update Liveblocks with the changed fields
+    updateLiveIssue(updatedIssue.id, {
+      title: updatedIssue.title,
+      identify: updatedIssue.identify,
+      discuss: updatedIssue.discuss,
+      solve: updatedIssue.solve,
+      ownerId: updatedIssue.ownerId,
+      dueDate: updatedIssue.dueDate ? updatedIssue.dueDate.toString() : null,
+      isResolved: updatedIssue.isResolved,
+    });
     setSelectedIssue(updatedIssue);
   };
+
+  const handleFocus = () => setFocused(true);
+  const handleBlurFocus = () => setFocused(false);
 
   return (
     <div className="bg-card rounded-lg border">
@@ -113,9 +165,10 @@ export function L10IdsSection({
         <span className="text-sm text-muted-foreground ml-2">
           (Identify, Discuss, Solve)
         </span>
-        {localIssues.length > 0 && (
+        <L10SectionPresence section="IDS" />
+        {issues.length > 0 && (
           <span className="text-sm text-muted-foreground ml-auto">
-            {localIssues.filter((i) => i.isResolved).length}/{localIssues.length} resolved
+            {issues.filter((i) => i.isResolved).length}/{issues.length} resolved
           </span>
         )}
       </button>
@@ -128,7 +181,7 @@ export function L10IdsSection({
 
           {/* Issues list */}
           <div className="space-y-2">
-            {localIssues.map((issue) => (
+            {issues.map((issue) => (
               <div
                 key={issue.id}
                 className={`flex items-center gap-3 p-2 rounded-md border cursor-pointer hover:bg-accent/50 transition-colors group ${
@@ -179,6 +232,8 @@ export function L10IdsSection({
             <Input
               value={newIssueTitle}
               onChange={(e) => setNewIssueTitle(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlurFocus}
               placeholder="New issue title"
               className="flex-1"
               onKeyDown={(e) => {
@@ -195,7 +250,7 @@ export function L10IdsSection({
 
       {/* Issue Detail Sheet */}
       <L10IdsIssueSheet
-        issue={selectedIssue}
+        issue={currentSelectedIssue}
         users={users}
         open={isSheetOpen}
         onOpenChange={setIsSheetOpen}

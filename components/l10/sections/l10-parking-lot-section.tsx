@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronRight, ParkingCircle, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import {
   updateParkingLotItem,
   deleteParkingLotItem,
 } from '@/lib/actions/l10';
+import { useParkingLotItems } from '../use-l10-storage';
+import { L10SectionPresence } from '../l10-presence';
 import type { L10ParkingLotItem } from '@/lib/types';
 
 interface L10ParkingLotSectionProps {
@@ -20,30 +22,28 @@ interface L10ParkingLotSectionProps {
 
 export function L10ParkingLotSection({
   documentId,
-  items,
+  items: initialItems,
   onUpdate,
 }: L10ParkingLotSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [newItemText, setNewItemText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-  const [localItems, setLocalItems] = useState<L10ParkingLotItem[]>(items);
-  const pendingSavesRef = useRef<Set<string>>(new Set());
 
-  // Sync local state with props when not pending saves
-  useEffect(() => {
-    if (pendingSavesRef.current.size === 0) {
-      setLocalItems(items);
-    } else {
-      setLocalItems((prev) =>
-        prev.map((i) =>
-          pendingSavesRef.current.has(i.id)
-            ? i
-            : items.find((pi) => pi.id === i.id) || i
-        )
-      );
-    }
-  }, [items]);
+  const {
+    items: liveItems,
+    updateItem: updateLiveItem,
+    addItem: addLiveItem,
+    deleteItem: deleteLiveItem,
+    setFocused,
+  } = useParkingLotItems();
+
+  // Use live items if available, otherwise fall back to initial
+  const items = liveItems ?? initialItems.map((i) => ({
+    id: i.id,
+    text: i.text,
+    orderIndex: i.orderIndex,
+  }));
 
   const handleAddItem = async () => {
     if (!newItemText.trim()) {
@@ -51,12 +51,24 @@ export function L10ParkingLotSection({
       return;
     }
 
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newItem = {
+      id: tempId,
+      text: newItemText.trim(),
+      orderIndex: items.length,
+    };
+
+    // Add to Liveblocks immediately
+    addLiveItem(newItem);
+    setNewItemText('');
+
     try {
       await createParkingLotItem(documentId, newItemText.trim());
-      setNewItemText('');
-      onUpdate();
+      onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add item');
+      deleteLiveItem(tempId); // Remove optimistic update on error
     }
   };
 
@@ -66,47 +78,43 @@ export function L10ParkingLotSection({
       return;
     }
 
-    const originalItem = localItems.find((i) => i.id === itemId);
+    const originalItem = items.find((i) => i.id === itemId);
     if (!originalItem || originalItem.text === editingText.trim()) {
       setEditingId(null);
       return;
     }
 
-    // Optimistic update
-    setLocalItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, text: editingText.trim() } : i))
-    );
-    pendingSavesRef.current.add(itemId);
+    // Update Liveblocks immediately
+    updateLiveItem(itemId, editingText.trim());
     setEditingId(null);
 
     try {
       await updateParkingLotItem(itemId, editingText.trim());
     } catch (error) {
       // Revert on error
-      setLocalItems((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, text: originalItem.text } : i))
-      );
+      updateLiveItem(itemId, originalItem.text);
       toast.error('Failed to update item');
-    } finally {
-      setTimeout(() => {
-        pendingSavesRef.current.delete(itemId);
-      }, 1000);
     }
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    // Optimistic update
-    const originalItems = [...localItems];
-    setLocalItems((prev) => prev.filter((i) => i.id !== itemId));
+    const originalItem = items.find((i) => i.id === itemId);
+    // Delete from Liveblocks immediately
+    deleteLiveItem(itemId);
 
     try {
       await deleteParkingLotItem(itemId);
     } catch (error) {
       // Revert on error
-      setLocalItems(originalItems);
+      if (originalItem) {
+        addLiveItem(originalItem);
+      }
       toast.error('Failed to delete item');
     }
   };
+
+  const handleFocus = () => setFocused(true);
+  const handleBlurFocus = () => setFocused(false);
 
   return (
     <div className="bg-card rounded-lg border">
@@ -124,24 +132,29 @@ export function L10ParkingLotSection({
         <span className="text-sm text-muted-foreground ml-2">
           (Stuff that matters, just not today.)
         </span>
+        <L10SectionPresence section="Parking Lot" />
       </button>
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-2">
           <div className="space-y-1">
-            {localItems.length === 0 && (
+            {items.length === 0 && (
               <p className="text-sm text-muted-foreground italic py-2">
                 No items in parking lot
               </p>
             )}
-            {localItems.map((item) => (
+            {items.map((item) => (
               <div key={item.id} className="flex items-center gap-2 group py-1">
                 <span className="text-muted-foreground">•</span>
                 {editingId === item.id ? (
                   <Input
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
-                    onBlur={() => handleSaveItem(item.id)}
+                    onFocus={handleFocus}
+                    onBlur={() => {
+                      handleSaveItem(item.id);
+                      handleBlurFocus();
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSaveItem(item.id);
                       if (e.key === 'Escape') setEditingId(null);
@@ -175,6 +188,8 @@ export function L10ParkingLotSection({
             <Input
               value={newItemText}
               onChange={(e) => setNewItemText(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlurFocus}
               placeholder="Add to parking lot..."
               className="flex-1"
               onKeyDown={(e) => {
