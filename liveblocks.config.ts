@@ -1,4 +1,4 @@
-import { createClient } from '@liveblocks/client';
+import { createClient, LiveList } from '@liveblocks/client';
 import { createRoomContext } from '@liveblocks/react';
 
 const client = createClient({
@@ -92,15 +92,15 @@ type Storage = {
   weekNumber: number | null;
 
   // Section data stored as LiveLists for real-time sync
-  segueEntries: SegueEntry[];
-  scorecardRows: ScorecardRow[];
-  rocks: Rock[];
-  lastWeekTodos: LastWeekTodo[];
-  idsIssues: IdsIssue[];
-  newTodos: NewTodo[];
-  wrapFeedback: WrapFeedback[];
-  wrapScores: WrapScore[];
-  parkingLotItems: ParkingLotItem[];
+  segueEntries: LiveList<SegueEntry>;
+  scorecardRows: LiveList<ScorecardRow>;
+  rocks: LiveList<Rock>;
+  lastWeekTodos: LiveList<LastWeekTodo>;
+  idsIssues: LiveList<IdsIssue>;
+  newTodos: LiveList<NewTodo>;
+  wrapFeedback: LiveList<WrapFeedback>;
+  wrapScores: LiveList<WrapScore>;
+  parkingLotItems: LiveList<ParkingLotItem>;
 };
 
 type UserMeta = {

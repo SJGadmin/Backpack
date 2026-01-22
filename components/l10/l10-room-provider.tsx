@@ -1,7 +1,8 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
-import { RoomProvider, useStorage, useMutation, useOthers, useSelf } from '@/liveblocks.config';
+import { ReactNode, useEffect, useRef } from 'react';
+import { LiveList } from '@liveblocks/client';
+import { RoomProvider, useMutation, useOthers, useSelf, useRoom } from '@/liveblocks.config';
 import { ClientSideSuspense } from '@liveblocks/react';
 import type { L10Document, UserInfo } from '@/lib/types';
 
@@ -21,6 +22,136 @@ function RoomLoading() {
   );
 }
 
+// Helper to clear a LiveList
+function clearLiveList(list: any) {
+  while (list.length > 0) {
+    list.delete(0);
+  }
+}
+
+// Component to sync storage with DB on mount
+function StorageSyncer({ initialDocument }: { initialDocument: L10Document }) {
+  const hasSynced = useRef(false);
+  const room = useRoom();
+
+  const syncStorage = useMutation(({ storage }) => {
+    // Update all storage arrays with the latest data from DB
+    const segueEntries = storage.get('segueEntries');
+    clearLiveList(segueEntries);
+    initialDocument.segueEntries.forEach((e) => {
+      segueEntries.push({
+        id: e.id,
+        userId: e.userId,
+        text: e.text,
+        orderIndex: e.orderIndex,
+      });
+    });
+
+    const scorecardRows = storage.get('scorecardRows');
+    clearLiveList(scorecardRows);
+    initialDocument.scorecardRows.forEach((r) => {
+      scorecardRows.push({
+        id: r.id,
+        metricId: r.metricId,
+        value: r.value,
+      });
+    });
+
+    const rocks = storage.get('rocks');
+    clearLiveList(rocks);
+    initialDocument.rocks.forEach((r) => {
+      rocks.push({
+        id: r.id,
+        userId: r.userId,
+        title: r.title,
+        isOnTrack: r.isOnTrack,
+        orderIndex: r.orderIndex,
+      });
+    });
+
+    const lastWeekTodos = storage.get('lastWeekTodos');
+    clearLiveList(lastWeekTodos);
+    initialDocument.lastWeekTodos.forEach((t) => {
+      lastWeekTodos.push({
+        id: t.id,
+        userId: t.userId,
+        text: t.text,
+        isDone: t.isDone,
+        orderIndex: t.orderIndex,
+      });
+    });
+
+    const idsIssues = storage.get('idsIssues');
+    clearLiveList(idsIssues);
+    initialDocument.idsIssues.forEach((i) => {
+      idsIssues.push({
+        id: i.id,
+        title: i.title,
+        identify: i.identify,
+        discuss: i.discuss,
+        solve: i.solve,
+        ownerId: i.ownerId,
+        dueDate: i.dueDate?.toString() || null,
+        isResolved: i.isResolved,
+        orderIndex: i.orderIndex,
+      });
+    });
+
+    const newTodos = storage.get('newTodos');
+    clearLiveList(newTodos);
+    initialDocument.newTodos.forEach((t) => {
+      newTodos.push({
+        id: t.id,
+        userId: t.userId,
+        text: t.text,
+        dueDate: t.dueDate?.toString() || null,
+        orderIndex: t.orderIndex,
+      });
+    });
+
+    const wrapFeedback = storage.get('wrapFeedback');
+    clearLiveList(wrapFeedback);
+    initialDocument.wrapFeedback.forEach((f) => {
+      wrapFeedback.push({
+        id: f.id,
+        type: f.type as 'positive' | 'negative',
+        text: f.text,
+        orderIndex: f.orderIndex,
+      });
+    });
+
+    const wrapScores = storage.get('wrapScores');
+    clearLiveList(wrapScores);
+    initialDocument.wrapScores.forEach((s) => {
+      wrapScores.push({
+        id: s.id,
+        userId: s.userId,
+        score: s.score,
+      });
+    });
+
+    const parkingLotItems = storage.get('parkingLotItems');
+    clearLiveList(parkingLotItems);
+    initialDocument.parkingLotItems.forEach((p) => {
+      parkingLotItems.push({
+        id: p.id,
+        text: p.text,
+        orderIndex: p.orderIndex,
+      });
+    });
+  }, [initialDocument]);
+
+  useEffect(() => {
+    // Only sync once per mount, and only if we're connected
+    if (!hasSynced.current && room.getStatus() === 'connected') {
+      syncStorage();
+      hasSynced.current = true;
+    }
+  }, [room, syncStorage]);
+
+  return null;
+}
+
 export function L10RoomProvider({
   documentId,
   initialDocument,
@@ -29,37 +160,37 @@ export function L10RoomProvider({
 }: L10RoomProviderProps) {
   const roomId = `l10-document-${documentId}`;
 
-  // Convert document data to initial storage format
+  // Convert document data to initial storage format with LiveLists
   const initialStorage = {
     title: initialDocument.title,
     meetingDate: initialDocument.meetingDate.toString(),
     weekNumber: initialDocument.weekNumber,
-    segueEntries: initialDocument.segueEntries.map((e) => ({
+    segueEntries: new LiveList(initialDocument.segueEntries.map((e) => ({
       id: e.id,
       userId: e.userId,
       text: e.text,
       orderIndex: e.orderIndex,
-    })),
-    scorecardRows: initialDocument.scorecardRows.map((r) => ({
+    }))),
+    scorecardRows: new LiveList(initialDocument.scorecardRows.map((r) => ({
       id: r.id,
       metricId: r.metricId,
       value: r.value,
-    })),
-    rocks: initialDocument.rocks.map((r) => ({
+    }))),
+    rocks: new LiveList(initialDocument.rocks.map((r) => ({
       id: r.id,
       userId: r.userId,
       title: r.title,
       isOnTrack: r.isOnTrack,
       orderIndex: r.orderIndex,
-    })),
-    lastWeekTodos: initialDocument.lastWeekTodos.map((t) => ({
+    }))),
+    lastWeekTodos: new LiveList(initialDocument.lastWeekTodos.map((t) => ({
       id: t.id,
       userId: t.userId,
       text: t.text,
       isDone: t.isDone,
       orderIndex: t.orderIndex,
-    })),
-    idsIssues: initialDocument.idsIssues.map((i) => ({
+    }))),
+    idsIssues: new LiveList(initialDocument.idsIssues.map((i) => ({
       id: i.id,
       title: i.title,
       identify: i.identify,
@@ -69,30 +200,30 @@ export function L10RoomProvider({
       dueDate: i.dueDate?.toString() || null,
       isResolved: i.isResolved,
       orderIndex: i.orderIndex,
-    })),
-    newTodos: initialDocument.newTodos.map((t) => ({
+    }))),
+    newTodos: new LiveList(initialDocument.newTodos.map((t) => ({
       id: t.id,
       userId: t.userId,
       text: t.text,
       dueDate: t.dueDate?.toString() || null,
       orderIndex: t.orderIndex,
-    })),
-    wrapFeedback: initialDocument.wrapFeedback.map((f) => ({
+    }))),
+    wrapFeedback: new LiveList(initialDocument.wrapFeedback.map((f) => ({
       id: f.id,
       type: f.type as 'positive' | 'negative',
       text: f.text,
       orderIndex: f.orderIndex,
-    })),
-    wrapScores: initialDocument.wrapScores.map((s) => ({
+    }))),
+    wrapScores: new LiveList(initialDocument.wrapScores.map((s) => ({
       id: s.id,
       userId: s.userId,
       score: s.score,
-    })),
-    parkingLotItems: initialDocument.parkingLotItems.map((p) => ({
+    }))),
+    parkingLotItems: new LiveList(initialDocument.parkingLotItems.map((p) => ({
       id: p.id,
       text: p.text,
       orderIndex: p.orderIndex,
-    })),
+    }))),
   };
 
   return (
@@ -106,7 +237,12 @@ export function L10RoomProvider({
       initialStorage={initialStorage}
     >
       <ClientSideSuspense fallback={<RoomLoading />}>
-        {() => children}
+        {() => (
+          <>
+            <StorageSyncer initialDocument={initialDocument} />
+            {children}
+          </>
+        )}
       </ClientSideSuspense>
     </RoomProvider>
   );

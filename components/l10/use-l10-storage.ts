@@ -13,7 +13,10 @@ export function useSegueEntries() {
       const entries = storage.get('segueEntries');
       const index = entries.findIndex((e: any) => e.id === entryId);
       if (index !== -1) {
-        entries[index] = { ...entries[index], text };
+        const current = entries.get(index);
+        if (current) {
+          entries.set(index, { ...current, text });
+        }
       }
     },
     []
@@ -24,7 +27,10 @@ export function useSegueEntries() {
       const entries = storage.get('segueEntries');
       const index = entries.findIndex((e: any) => e.userId === userId);
       if (index !== -1) {
-        entries[index] = { ...entries[index], text };
+        const current = entries.get(index);
+        if (current) {
+          entries.set(index, { ...current, text });
+        }
       }
     },
     []
@@ -50,7 +56,10 @@ export function useScorecardRows() {
       const rows = storage.get('scorecardRows');
       const index = rows.findIndex((r: any) => r.id === rowId);
       if (index !== -1) {
-        rows[index] = { ...rows[index], value };
+        const current = rows.get(index);
+        if (current) {
+          rows.set(index, { ...current, value });
+        }
       }
     },
     []
@@ -61,7 +70,10 @@ export function useScorecardRows() {
       const rows = storage.get('scorecardRows');
       const index = rows.findIndex((r: any) => r.metricId === metricId);
       if (index !== -1) {
-        rows[index] = { ...rows[index], value };
+        const current = rows.get(index);
+        if (current) {
+          rows.set(index, { ...current, value });
+        }
       }
     },
     []
@@ -87,7 +99,10 @@ export function useRocks() {
       const rocks = storage.get('rocks');
       const index = rocks.findIndex((r: any) => r.id === rockId);
       if (index !== -1) {
-        rocks[index] = { ...rocks[index], ...updates };
+        const current = rocks.get(index);
+        if (current) {
+          rocks.set(index, { ...current, ...updates });
+        }
       }
     },
     []
@@ -106,7 +121,7 @@ export function useRocks() {
       const rocks = storage.get('rocks');
       const index = rocks.findIndex((r: any) => r.id === rockId);
       if (index !== -1) {
-        rocks.splice(index, 1);
+        rocks.delete(index);
       }
     },
     []
@@ -132,7 +147,10 @@ export function useLastWeekTodos() {
       const todos = storage.get('lastWeekTodos');
       const index = todos.findIndex((t: any) => t.id === todoId);
       if (index !== -1) {
-        todos[index] = { ...todos[index], ...updates };
+        const current = todos.get(index);
+        if (current) {
+          todos.set(index, { ...current, ...updates });
+        }
       }
     },
     []
@@ -151,7 +169,7 @@ export function useLastWeekTodos() {
       const todos = storage.get('lastWeekTodos');
       const index = todos.findIndex((t: any) => t.id === todoId);
       if (index !== -1) {
-        todos.splice(index, 1);
+        todos.delete(index);
       }
     },
     []
@@ -185,7 +203,10 @@ export function useIdsIssues() {
       const issues = storage.get('idsIssues');
       const index = issues.findIndex((i: any) => i.id === issueId);
       if (index !== -1) {
-        issues[index] = { ...issues[index], ...updates };
+        const current = issues.get(index);
+        if (current) {
+          issues.set(index, { ...current, ...updates });
+        }
       }
     },
     []
@@ -214,7 +235,7 @@ export function useIdsIssues() {
       const issues = storage.get('idsIssues');
       const index = issues.findIndex((i: any) => i.id === issueId);
       if (index !== -1) {
-        issues.splice(index, 1);
+        issues.delete(index);
       }
     },
     []
@@ -240,7 +261,10 @@ export function useNewTodos() {
       const todos = storage.get('newTodos');
       const index = todos.findIndex((t: any) => t.id === todoId);
       if (index !== -1) {
-        todos[index] = { ...todos[index], ...updates };
+        const current = todos.get(index);
+        if (current) {
+          todos.set(index, { ...current, ...updates });
+        }
       }
     },
     []
@@ -259,7 +283,7 @@ export function useNewTodos() {
       const todos = storage.get('newTodos');
       const index = todos.findIndex((t: any) => t.id === todoId);
       if (index !== -1) {
-        todos.splice(index, 1);
+        todos.delete(index);
       }
     },
     []
@@ -285,7 +309,10 @@ export function useWrapFeedback() {
       const feedback = storage.get('wrapFeedback');
       const index = feedback.findIndex((f: any) => f.id === feedbackId);
       if (index !== -1) {
-        feedback[index] = { ...feedback[index], text };
+        const current = feedback.get(index);
+        if (current) {
+          feedback.set(index, { ...current, text });
+        }
       }
     },
     []
@@ -304,7 +331,7 @@ export function useWrapFeedback() {
       const feedback = storage.get('wrapFeedback');
       const index = feedback.findIndex((f: any) => f.id === feedbackId);
       if (index !== -1) {
-        feedback.splice(index, 1);
+        feedback.delete(index);
       }
     },
     []
@@ -329,7 +356,10 @@ export function useWrapScores() {
       const scores = storage.get('wrapScores');
       const index = scores.findIndex((s: any) => s.id === scoreId);
       if (index !== -1) {
-        scores[index] = { ...scores[index], score };
+        const current = scores.get(index);
+        if (current) {
+          scores.set(index, { ...current, score });
+        }
       }
     },
     []
@@ -356,7 +386,10 @@ export function useParkingLotItems() {
       const items = storage.get('parkingLotItems');
       const index = items.findIndex((i: any) => i.id === itemId);
       if (index !== -1) {
-        items[index] = { ...items[index], text };
+        const current = items.get(index);
+        if (current) {
+          items.set(index, { ...current, text });
+        }
       }
     },
     []
@@ -375,7 +408,7 @@ export function useParkingLotItems() {
       const items = storage.get('parkingLotItems');
       const index = items.findIndex((i: any) => i.id === itemId);
       if (index !== -1) {
-        items.splice(index, 1);
+        items.delete(index);
       }
     },
     []
