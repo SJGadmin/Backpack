@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon, Settings } from 'lucide-react';
+import { CalendarIcon, Settings, Users } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,8 @@ import { L10WrapSection } from './sections/l10-wrap-section';
 import { L10ParkingLotSection } from './sections/l10-parking-lot-section';
 import { L10MetricsDialog } from './l10-metrics-dialog';
 import { L10CarryForwardDialog } from './l10-carry-forward-dialog';
+import { L10RoomProvider } from './l10-room-provider';
+import { L10Presence } from './l10-presence';
 
 interface L10DocumentEditorProps {
   document: L10Document;
@@ -34,6 +36,24 @@ interface L10DocumentEditorProps {
 }
 
 export function L10DocumentEditor({
+  document,
+  folderId,
+  users,
+  onUpdate,
+}: L10DocumentEditorProps) {
+  return (
+    <L10RoomProvider documentId={document.id} initialDocument={document} users={users}>
+      <L10DocumentEditorContent
+        document={document}
+        folderId={folderId}
+        users={users}
+        onUpdate={onUpdate}
+      />
+    </L10RoomProvider>
+  );
+}
+
+function L10DocumentEditorContent({
   document,
   folderId,
   users,
@@ -112,13 +132,16 @@ export function L10DocumentEditor({
         <div className="bg-card rounded-lg border p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 space-y-4">
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={handleTitleBlur}
-                className="text-2xl font-bold border-0 px-0 focus-visible:ring-0 bg-transparent"
-                placeholder="Meeting Title"
-              />
+              <div className="flex items-center justify-between">
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={handleTitleBlur}
+                  className="text-2xl font-bold border-0 px-0 focus-visible:ring-0 bg-transparent flex-1"
+                  placeholder="Meeting Title"
+                />
+                <L10Presence />
+              </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <Popover>
                   <PopoverTrigger asChild>
