@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Target, Plus, X, Circle, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,9 +42,31 @@ export function L10RocksSection({
     rocks: liveRocks,
     updateRock: updateLiveRock,
     addRock: addLiveRock,
+    addRocks: addLiveRocks,
     deleteRock: deleteLiveRock,
     setFocused,
   } = useRocks();
+
+  // Sync initialRocks to Liveblocks if they're missing
+  // This handles the case where rocks are added via carry-forward and
+  // Liveblocks storage doesn't have them yet
+  useEffect(() => {
+    if (liveRocks && initialRocks.length > 0) {
+      const liveIds = new Set(liveRocks.map((r) => r.id));
+      const missingRocks = initialRocks
+        .filter((r) => !liveIds.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          userId: r.userId,
+          title: r.title,
+          isOnTrack: r.isOnTrack,
+          orderIndex: r.orderIndex,
+        }));
+      if (missingRocks.length > 0) {
+        addLiveRocks(missingRocks);
+      }
+    }
+  }, [initialRocks, liveRocks, addLiveRocks]);
 
   // Use live rocks if available, otherwise fall back to initial
   const rocks = liveRocks ?? initialRocks.map((r) => ({

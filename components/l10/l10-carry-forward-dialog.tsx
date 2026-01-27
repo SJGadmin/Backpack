@@ -160,7 +160,7 @@ export function L10CarryForwardDialog({
         toast.success(`${selectedIds.size} rock(s) carried forward`);
       }
       onOpenChange(false);
-      onSuccess();
+      onSuccess(); // Refresh document data - the sections will sync any missing items to Liveblocks
     } catch (error) {
       toast.error(`Failed to carry forward ${mode}`);
     } finally {
