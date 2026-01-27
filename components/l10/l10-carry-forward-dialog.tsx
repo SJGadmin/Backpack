@@ -21,6 +21,7 @@ import {
   getPreviousMeetingRocks,
   carryForwardRocksFromPreviousMeeting,
 } from '@/lib/actions/l10';
+import { useRocks, useLastWeekTodos } from './use-l10-storage';
 import type { L10NewTodo, L10Rock } from '@/lib/types';
 
 interface L10CarryForwardDialogProps {
@@ -53,6 +54,10 @@ export function L10CarryForwardDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Get Liveblocks mutations for syncing
+  const { addRocks } = useRocks();
+  const { addTodos: addLastWeekTodos } = useLastWeekTodos();
 
   // Load data on open
   useEffect(() => {
@@ -120,18 +125,38 @@ export function L10CarryForwardDialog({
     setIsSubmitting(true);
     try {
       if (mode === 'todos') {
-        await carryForwardTodosFromPreviousMeeting(
+        const createdTodos = await carryForwardTodosFromPreviousMeeting(
           folderId,
           currentDocumentId,
           Array.from(selectedIds)
         );
+        // Sync to Liveblocks immediately so they appear without page refresh
+        if (createdTodos && createdTodos.length > 0) {
+          addLastWeekTodos(createdTodos.map((t) => ({
+            id: t.id,
+            userId: t.userId,
+            text: t.text,
+            isDone: t.isDone,
+            orderIndex: t.orderIndex,
+          })));
+        }
         toast.success(`${selectedIds.size} to-do(s) carried forward`);
       } else {
-        await carryForwardRocksFromPreviousMeeting(
+        const createdRocks = await carryForwardRocksFromPreviousMeeting(
           folderId,
           currentDocumentId,
           Array.from(selectedIds)
         );
+        // Sync to Liveblocks immediately so they appear without page refresh
+        if (createdRocks && createdRocks.length > 0) {
+          addRocks(createdRocks.map((r) => ({
+            id: r.id,
+            userId: r.userId,
+            title: r.title,
+            isOnTrack: r.isOnTrack,
+            orderIndex: r.orderIndex,
+          })));
+        }
         toast.success(`${selectedIds.size} rock(s) carried forward`);
       }
       onOpenChange(false);

@@ -116,6 +116,20 @@ export function useRocks() {
     []
   );
 
+  const addRocks = useMutation(
+    ({ storage }, newRocks: { id: string; userId: string; title: string; isOnTrack: boolean; orderIndex: number }[]) => {
+      const rocks = storage.get('rocks');
+      // Only add rocks that don't already exist
+      newRocks.forEach((rock) => {
+        const exists = rocks.findIndex((r: any) => r.id === rock.id) !== -1;
+        if (!exists) {
+          rocks.push(rock);
+        }
+      });
+    },
+    []
+  );
+
   const deleteRock = useMutation(
     ({ storage }, rockId: string) => {
       const rocks = storage.get('rocks');
@@ -134,7 +148,7 @@ export function useRocks() {
     [updatePresence]
   );
 
-  return { rocks, updateRock, addRock, deleteRock, setFocused };
+  return { rocks, updateRock, addRock, addRocks, deleteRock, setFocused };
 }
 
 // Hook for real-time last week todos
@@ -164,6 +178,20 @@ export function useLastWeekTodos() {
     []
   );
 
+  const addTodos = useMutation(
+    ({ storage }, newTodos: { id: string; userId: string; text: string; isDone: boolean; orderIndex: number }[]) => {
+      const todos = storage.get('lastWeekTodos');
+      // Only add todos that don't already exist
+      newTodos.forEach((todo) => {
+        const exists = todos.findIndex((t: any) => t.id === todo.id) !== -1;
+        if (!exists) {
+          todos.push(todo);
+        }
+      });
+    },
+    []
+  );
+
   const deleteTodo = useMutation(
     ({ storage }, todoId: string) => {
       const todos = storage.get('lastWeekTodos');
@@ -182,7 +210,7 @@ export function useLastWeekTodos() {
     [updatePresence]
   );
 
-  return { todos, updateTodo, addTodo, deleteTodo, setFocused };
+  return { todos, updateTodo, addTodo, addTodos, deleteTodo, setFocused };
 }
 
 // Hook for real-time IDS issues
