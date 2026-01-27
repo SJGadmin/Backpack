@@ -37,6 +37,7 @@ export function L10RocksSection({
   const [newRockTitle, setNewRockTitle] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const {
     rocks: liveRocks,
@@ -54,7 +55,7 @@ export function L10RocksSection({
     if (liveRocks && initialRocks.length > 0) {
       const liveIds = new Set(liveRocks.map((r) => r.id));
       const missingRocks = initialRocks
-        .filter((r) => !liveIds.has(r.id))
+        .filter((r) => !liveIds.has(r.id) && !deletedIds.has(r.id))
         .map((r) => ({
           id: r.id,
           userId: r.userId,
@@ -66,7 +67,7 @@ export function L10RocksSection({
         addLiveRocks(missingRocks);
       }
     }
-  }, [initialRocks, liveRocks, addLiveRocks]);
+  }, [initialRocks, liveRocks, addLiveRocks, deletedIds]);
 
   // Use live rocks if available, otherwise fall back to initial
   const rocks = liveRocks ?? initialRocks.map((r) => ({
@@ -153,6 +154,8 @@ export function L10RocksSection({
 
   const handleDeleteRock = async (rockId: string) => {
     const originalRock = rocks.find((r) => r.id === rockId);
+    // Track as deleted so sync effect doesn't re-add it
+    setDeletedIds((prev) => new Set(prev).add(rockId));
     // Delete from Liveblocks immediately
     deleteLiveRock(rockId);
 
@@ -160,6 +163,11 @@ export function L10RocksSection({
       await deleteRock(rockId);
     } catch (error) {
       // Revert on error
+      setDeletedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(rockId);
+        return next;
+      });
       if (originalRock) {
         addLiveRock(originalRock);
       }

@@ -79,12 +79,6 @@ type WrapScore = {
   score: number;
 };
 
-type ParkingLotItem = {
-  id: string;
-  text: string;
-  orderIndex: number;
-};
-
 type Storage = {
   // Document metadata
   title: string;
@@ -100,7 +94,7 @@ type Storage = {
   newTodos: LiveList<NewTodo>;
   wrapFeedback: LiveList<WrapFeedback>;
   wrapScores: LiveList<WrapScore>;
-  parkingLotItems: LiveList<ParkingLotItem>;
+  // Note: parkingLotItems removed - now stored globally in database
 };
 
 type UserMeta = {

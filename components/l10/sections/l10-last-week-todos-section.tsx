@@ -51,6 +51,7 @@ export function L10LastWeekTodosSection({
   const [newTodoText, setNewTodoText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const {
     todos: liveTodos,
@@ -68,7 +69,7 @@ export function L10LastWeekTodosSection({
     if (liveTodos && initialTodos.length > 0) {
       const liveIds = new Set(liveTodos.map((t) => t.id));
       const missingTodos = initialTodos
-        .filter((t) => !liveIds.has(t.id))
+        .filter((t) => !liveIds.has(t.id) && !deletedIds.has(t.id))
         .map((t) => ({
           id: t.id,
           userId: t.userId,
@@ -80,7 +81,7 @@ export function L10LastWeekTodosSection({
         addLiveTodos(missingTodos);
       }
     }
-  }, [initialTodos, liveTodos, addLiveTodos]);
+  }, [initialTodos, liveTodos, addLiveTodos, deletedIds]);
 
   // Use live todos if available, otherwise fall back to initial
   const todos = liveTodos ?? initialTodos.map((t) => ({
@@ -171,6 +172,8 @@ export function L10LastWeekTodosSection({
 
   const handleDeleteTodo = async (todoId: string) => {
     const originalTodo = todos.find((t) => t.id === todoId);
+    // Track as deleted so sync effect doesn't re-add it
+    setDeletedIds((prev) => new Set(prev).add(todoId));
     // Delete from Liveblocks immediately
     deleteLiveTodo(todoId);
 
@@ -178,6 +181,11 @@ export function L10LastWeekTodosSection({
       await deleteLastWeekTodo(todoId);
     } catch (error) {
       // Revert on error
+      setDeletedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(todoId);
+        return next;
+      });
       if (originalTodo) {
         addLiveTodo(originalTodo);
       }

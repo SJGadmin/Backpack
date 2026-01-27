@@ -89,11 +89,7 @@ export function L10RoomProvider({
       userId: s.userId,
       score: s.score,
     }))),
-    parkingLotItems: new LiveList(initialDocument.parkingLotItems.map((p) => ({
-      id: p.id,
-      text: p.text,
-      orderIndex: p.orderIndex,
-    }))),
+    // Note: parkingLotItems removed - now stored globally in database
   };
 
   return (

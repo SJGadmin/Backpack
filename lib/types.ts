@@ -188,6 +188,8 @@ export type L10WrapScore = Prisma.L10WrapScoreGetPayload<{
 
 export type L10ParkingLotItem = Prisma.L10ParkingLotItemGetPayload<{}>;
 
+export type L10GlobalParkingLotItem = Prisma.L10GlobalParkingLotItemGetPayload<{}>;
+
 export type L10Document = Prisma.L10DocumentGetPayload<{
   include: {
     folder: true;

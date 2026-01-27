@@ -237,12 +237,8 @@ function L10DocumentEditorContent({
           onUpdate={onUpdate}
         />
 
-        {/* Parking Lot Section */}
-        <L10ParkingLotSection
-          documentId={document.id}
-          items={document.parkingLotItems}
-          onUpdate={onUpdate}
-        />
+        {/* Parking Lot Section - Global across all documents */}
+        <L10ParkingLotSection />
       </div>
 
       {/* Metrics Configuration Dialog */}

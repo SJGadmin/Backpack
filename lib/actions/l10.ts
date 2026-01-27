@@ -905,7 +905,7 @@ export async function upsertWrapScore(
 }
 
 // ============================================
-// PARKING LOT ACTIONS
+// PARKING LOT ACTIONS (Legacy per-document)
 // ============================================
 
 export async function createParkingLotItem(documentId: string, text: string) {
@@ -981,6 +981,98 @@ export async function reorderParkingLotItems(
   await prisma.$transaction(
     itemIds.map((id, index) =>
       prisma.l10ParkingLotItem.update({
+        where: { id },
+        data: { orderIndex: index },
+      })
+    )
+  );
+
+  revalidatePath('/board');
+}
+
+// ============================================
+// GLOBAL PARKING LOT ACTIONS (Shared across all documents)
+// ============================================
+
+export async function getGlobalParkingLotItems() {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const items = await prisma.l10GlobalParkingLotItem.findMany({
+    orderBy: { orderIndex: 'asc' },
+  });
+
+  return items;
+}
+
+export async function createGlobalParkingLotItem(text: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const maxItem = await prisma.l10GlobalParkingLotItem.findFirst({
+    orderBy: { orderIndex: 'desc' },
+  });
+
+  const item = await prisma.l10GlobalParkingLotItem.create({
+    data: {
+      text,
+      orderIndex: (maxItem?.orderIndex ?? -1) + 1,
+    },
+  });
+
+  revalidatePath('/board');
+  return item;
+}
+
+export async function updateGlobalParkingLotItem(itemId: string, text: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  try {
+    const item = await prisma.l10GlobalParkingLotItem.update({
+      where: { id: itemId },
+      data: { text },
+    });
+
+    revalidatePath('/board');
+    return item;
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      console.log(`GlobalParkingLotItem ${itemId} not found for update`);
+      revalidatePath('/board');
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function deleteGlobalParkingLotItem(itemId: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  try {
+    await prisma.l10GlobalParkingLotItem.delete({
+      where: { id: itemId },
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      console.log(`GlobalParkingLotItem ${itemId} already deleted or doesn't exist`);
+      revalidatePath('/board');
+      return;
+    }
+    throw error;
+  }
+
+  revalidatePath('/board');
+}
+
+export async function reorderGlobalParkingLotItems(itemIds: string[]) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  await prisma.$transaction(
+    itemIds.map((id, index) =>
+      prisma.l10GlobalParkingLotItem.update({
         where: { id },
         data: { orderIndex: index },
       })
