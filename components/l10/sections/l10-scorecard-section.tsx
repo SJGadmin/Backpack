@@ -4,8 +4,9 @@ import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight, BarChart3, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { updateScorecardRow } from '@/lib/actions/l10';
-import { useScorecardRows } from '../use-l10-storage';
+import { Textarea } from '@/components/ui/textarea';
+import { updateScorecardRow, updateScorecardNotes } from '@/lib/actions/l10';
+import { useScorecardRows, useScorecardNotes } from '../use-l10-storage';
 import { L10SectionPresence } from '../l10-presence';
 import type { L10ScorecardRow, L10ScorecardMetric } from '@/lib/types';
 
@@ -13,6 +14,7 @@ interface L10ScorecardSectionProps {
   documentId: string;
   rows: L10ScorecardRow[];
   metrics: L10ScorecardMetric[];
+  scorecardNotes: string | null;
   onUpdate: () => void;
   onConfigureMetrics: () => void;
 }
@@ -21,10 +23,15 @@ export function L10ScorecardSection({
   documentId,
   rows: initialRows,
   metrics,
+  scorecardNotes: initialNotes,
   onConfigureMetrics,
 }: L10ScorecardSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const { rows: liveRows, updateRowByMetricId, setFocused } = useScorecardRows();
+  const { notes: liveNotes, updateNotes } = useScorecardNotes();
+
+  // Use live notes if available, otherwise fall back to initial
+  const notes = liveNotes ?? (initialNotes || '');
 
   // Use live rows if available, otherwise fall back to initial
   const rows = liveRows ?? initialRows.map((r) => ({
@@ -66,6 +73,18 @@ export function L10ScorecardSection({
     setFocused(false);
   };
 
+  const handleNotesChange = (text: string) => {
+    updateNotes(text);
+  };
+
+  const handleNotesBlur = async () => {
+    try {
+      await updateScorecardNotes(documentId, notes);
+    } catch (error) {
+      console.error('Failed to persist scorecard notes:', error);
+    }
+  };
+
   return (
     <div className="bg-card rounded-lg border">
       <div className="flex items-center">
@@ -96,7 +115,7 @@ export function L10ScorecardSection({
       </div>
 
       {isExpanded && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 space-y-4">
           {metrics.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               No metrics configured.{' '}
@@ -127,6 +146,23 @@ export function L10ScorecardSection({
               ))}
             </div>
           )}
+
+          {/* Notes section */}
+          <div className="pt-2 border-t">
+            <label className="text-sm font-medium text-muted-foreground">Notes</label>
+            <Textarea
+              value={notes}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={() => {
+                handleNotesBlur();
+                handleBlurFocus();
+              }}
+              placeholder="Add any notes about this week's scorecard..."
+              className="mt-1 min-h-[60px] resize-none"
+              rows={2}
+            />
+          </div>
         </div>
       )}
     </div>

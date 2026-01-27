@@ -89,6 +89,28 @@ export function useScorecardRows() {
   return { rows, updateRow, updateRowByMetricId, setFocused };
 }
 
+// Hook for real-time scorecard notes
+export function useScorecardNotes() {
+  const notes = useStorage((root) => root.scorecardNotes);
+  const updatePresence = useUpdateMyPresence();
+
+  const updateNotes = useMutation(
+    ({ storage }, text: string) => {
+      storage.set('scorecardNotes', text);
+    },
+    []
+  );
+
+  const setFocused = useCallback(
+    (focused: boolean) => {
+      updatePresence({ focusedSection: focused ? 'Scorecard' : null });
+    },
+    [updatePresence]
+  );
+
+  return { notes, updateNotes, setFocused };
+}
+
 // Hook for real-time rocks
 export function useRocks() {
   const rocks = useStorage((root) => root.rocks);

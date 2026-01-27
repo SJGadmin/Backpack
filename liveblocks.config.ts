@@ -90,6 +90,7 @@ type Storage = {
   title: string;
   meetingDate: string;
   weekNumber: number | null;
+  scorecardNotes: string;
 
   // Section data stored as LiveLists for real-time sync
   segueEntries: LiveList<SegueEntry>;

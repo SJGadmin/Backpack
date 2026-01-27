@@ -190,6 +190,7 @@ function L10DocumentEditorContent({
           documentId={document.id}
           rows={document.scorecardRows}
           metrics={metrics}
+          scorecardNotes={document.scorecardNotes}
           onUpdate={onUpdate}
           onConfigureMetrics={() => setIsMetricsDialogOpen(true)}
         />
