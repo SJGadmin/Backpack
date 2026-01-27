@@ -450,22 +450,6 @@ export async function updateScorecardRow(
   return row;
 }
 
-export async function updateScorecardNotes(
-  documentId: string,
-  notes: string
-) {
-  const user = await getCurrentUser();
-  if (!user) throw new Error('Unauthorized');
-
-  const document = await prisma.l10Document.update({
-    where: { id: documentId },
-    data: { scorecardNotes: notes },
-  });
-
-  revalidatePath('/board');
-  return document;
-}
-
 // ============================================
 // ROCKS ACTIONS
 // ============================================

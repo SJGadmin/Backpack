@@ -207,15 +207,14 @@ model L10Folder {
 
 // Individual L10 Meeting Document
 model L10Document {
-  id             String   @id @default(cuid())
-  folderId       String
-  title          String
-  meetingDate    DateTime
-  weekNumber     Int?
-  scorecardNotes String?  @db.Text
-  orderIndex     Int
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  folderId    String
+  title       String
+  meetingDate DateTime
+  weekNumber  Int?
+  orderIndex  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   folder          L10Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
