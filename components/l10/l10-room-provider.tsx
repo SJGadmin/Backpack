@@ -35,7 +35,7 @@ export function L10RoomProvider({
     title: initialDocument.title,
     meetingDate: initialDocument.meetingDate.toString(),
     weekNumber: initialDocument.weekNumber,
-    scorecardNotes: initialDocument.scorecardNotes || '',
+    scorecardNotes: (initialDocument as any).scorecardNotes || '',
     segueEntries: new LiveList(initialDocument.segueEntries.map((e) => ({
       id: e.id,
       userId: e.userId,
