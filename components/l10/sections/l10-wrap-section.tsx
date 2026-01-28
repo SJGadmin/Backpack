@@ -110,6 +110,8 @@ export function L10WrapSection({
 
     try {
       await createWrapFeedback(documentId, type, text.trim());
+      // Remove the temp feedback before refresh adds the real one
+      deleteLiveFeedback(tempId);
       onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add feedback');

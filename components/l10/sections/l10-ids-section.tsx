@@ -104,6 +104,8 @@ export function L10IdsSection({
 
     try {
       await createIdsIssue(documentId, newIssueTitle.trim());
+      // Remove the temp issue before refresh adds the real one
+      deleteLiveIssue(tempId);
       onUpdate(); // Refresh to get the real ID and issueNumber
     } catch (error) {
       toast.error('Failed to add issue');

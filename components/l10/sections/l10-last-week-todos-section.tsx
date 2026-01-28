@@ -124,6 +124,8 @@ export function L10LastWeekTodosSection({
 
     try {
       await createLastWeekTodo(documentId, newTodoUserId, newTodoText.trim());
+      // Remove the temp todo before refresh adds the real one
+      deleteLiveTodo(tempId);
       onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add to-do');

@@ -106,6 +106,8 @@ export function L10RocksSection({
 
     try {
       await createRock(documentId, newRockUserId, newRockTitle.trim());
+      // Remove the temp rock before refresh adds the real one
+      deleteLiveRock(tempId);
       onUpdate(); // Refresh to get the real ID
     } catch (error) {
       toast.error('Failed to add rock');
