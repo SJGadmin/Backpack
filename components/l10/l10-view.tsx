@@ -25,6 +25,7 @@ import {
   getL10Document,
   reorderL10Folders,
   reorderL10Documents,
+  deleteL10Document,
 } from '@/lib/actions/l10';
 import type {
   L10FolderWithCount,
@@ -135,6 +136,22 @@ export function L10View({ users }: L10ViewProps) {
     }
     if (selectedFolderId) {
       loadDocuments(selectedFolderId);
+    }
+  };
+
+  const handleDocumentDeleted = async (documentId: string) => {
+    try {
+      await deleteL10Document(documentId);
+      if (selectedDocumentId === documentId) {
+        setSelectedDocumentId(null);
+        setDocument(null);
+      }
+      if (selectedFolderId) {
+        loadDocuments(selectedFolderId);
+      }
+      loadFolders(); // Update document counts
+    } catch (error) {
+      console.error('Failed to delete document:', error);
     }
   };
 
@@ -286,6 +303,7 @@ export function L10View({ users }: L10ViewProps) {
                       document={doc}
                       isSelected={selectedDocumentId === doc.id}
                       onClick={() => setSelectedDocumentId(doc.id)}
+                      onDelete={handleDocumentDeleted}
                     />
                   ))}
                 </SortableContext>

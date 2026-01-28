@@ -3,19 +3,22 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
-import { FileText, ChevronRight, GripVertical } from 'lucide-react';
+import { FileText, ChevronRight, GripVertical, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { L10DocumentSummary } from '@/lib/types';
 
 interface SortableL10DocumentProps {
   document: L10DocumentSummary;
   isSelected: boolean;
   onClick: () => void;
+  onDelete?: (id: string) => void;
 }
 
 export function SortableL10Document({
   document,
   isSelected,
   onClick,
+  onDelete,
 }: SortableL10DocumentProps) {
   const {
     attributes,
@@ -36,7 +39,7 @@ export function SortableL10Document({
     <div
       ref={setNodeRef}
       style={style}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors group ${
         isSelected
           ? 'bg-primary text-primary-foreground'
           : 'hover:bg-accent'
@@ -70,6 +73,23 @@ export function SortableL10Document({
         </div>
         <ChevronRight className="h-4 w-4 flex-shrink-0 opacity-50" />
       </button>
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+            isSelected ? 'hover:bg-primary-foreground/20' : 'hover:bg-destructive/20'
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm('Delete this meeting? This cannot be undone.')) {
+              onDelete(document.id);
+            }
+          }}
+        >
+          <Trash2 className={`h-3 w-3 ${isSelected ? 'text-primary-foreground' : 'text-destructive'}`} />
+        </Button>
+      )}
     </div>
   );
 }
