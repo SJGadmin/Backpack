@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -49,6 +49,7 @@ export function L10WrapSection({
     feedback: liveFeedback,
     updateFeedback: updateLiveFeedback,
     addFeedback: addLiveFeedback,
+    addFeedbacks: addLiveFeedbacks,
     deleteFeedback: deleteLiveFeedback,
     setFocused,
   } = useWrapFeedback();
@@ -57,7 +58,43 @@ export function L10WrapSection({
     scores: liveScores,
     updateScore: updateLiveScore,
     addScore: addLiveScore,
+    addScores: addLiveScores,
   } = useWrapScores();
+
+  // Sync initialFeedback to Liveblocks if they're missing
+  useEffect(() => {
+    if (liveFeedback && initialFeedback.length > 0) {
+      const liveIds = new Set(liveFeedback.map((f) => f.id));
+      const missingFeedback = initialFeedback
+        .filter((f) => !liveIds.has(f.id))
+        .map((f) => ({
+          id: f.id,
+          type: f.type as 'positive' | 'negative',
+          text: f.text,
+          orderIndex: f.orderIndex,
+        }));
+      if (missingFeedback.length > 0) {
+        addLiveFeedbacks(missingFeedback);
+      }
+    }
+  }, [initialFeedback, liveFeedback, addLiveFeedbacks]);
+
+  // Sync initialScores to Liveblocks if they're missing
+  useEffect(() => {
+    if (liveScores && initialScores.length > 0) {
+      const liveIds = new Set(liveScores.map((s) => s.id));
+      const missingScores = initialScores
+        .filter((s) => !liveIds.has(s.id))
+        .map((s) => ({
+          id: s.id,
+          userId: s.userId,
+          score: s.score,
+        }));
+      if (missingScores.length > 0) {
+        addLiveScores(missingScores);
+      }
+    }
+  }, [initialScores, liveScores, addLiveScores]);
 
   // Use live data if available, otherwise fall back to initial
   const feedback = liveFeedback ?? initialFeedback.map((f) => ({

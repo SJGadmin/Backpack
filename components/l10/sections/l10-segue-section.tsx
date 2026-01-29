@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { updateSegueEntry } from '@/lib/actions/l10';
@@ -21,7 +21,25 @@ export function L10SegueSection({
   users,
 }: L10SegueSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const { entries: liveEntries, updateEntryByUserId, setFocused } = useSegueEntries();
+  const { entries: liveEntries, updateEntryByUserId, addEntries, setFocused } = useSegueEntries();
+
+  // Sync initialEntries to Liveblocks if they're missing
+  useEffect(() => {
+    if (liveEntries && initialEntries.length > 0) {
+      const liveIds = new Set(liveEntries.map((e) => e.id));
+      const missingEntries = initialEntries
+        .filter((e) => !liveIds.has(e.id))
+        .map((e) => ({
+          id: e.id,
+          userId: e.userId,
+          text: e.text,
+          orderIndex: e.orderIndex,
+        }));
+      if (missingEntries.length > 0) {
+        addEntries(missingEntries);
+      }
+    }
+  }, [initialEntries, liveEntries, addEntries]);
 
   // Use live entries if available, otherwise fall back to initial
   const entries = liveEntries ?? initialEntries.map((e) => ({

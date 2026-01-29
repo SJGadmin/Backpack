@@ -36,6 +36,19 @@ export function useSegueEntries() {
     []
   );
 
+  const addEntries = useMutation(
+    ({ storage }, newEntries: { id: string; userId: string; text: string; orderIndex: number }[]) => {
+      const entries = storage.get('segueEntries');
+      newEntries.forEach((entry) => {
+        const exists = entries.findIndex((e: any) => e.id === entry.id) !== -1;
+        if (!exists) {
+          entries.push(entry);
+        }
+      });
+    },
+    []
+  );
+
   const setFocused = useCallback(
     (focused: boolean) => {
       updatePresence({ focusedSection: focused ? 'Segue' : null });
@@ -43,7 +56,7 @@ export function useSegueEntries() {
     [updatePresence]
   );
 
-  return { entries, updateEntry, updateEntryByUserId, setFocused };
+  return { entries, updateEntry, updateEntryByUserId, addEntries, setFocused };
 }
 
 // Hook for real-time scorecard rows
@@ -79,6 +92,19 @@ export function useScorecardRows() {
     []
   );
 
+  const addRows = useMutation(
+    ({ storage }, newRows: { id: string; metricId: string; value: number | null }[]) => {
+      const rows = storage.get('scorecardRows');
+      newRows.forEach((row) => {
+        const exists = rows.findIndex((r: any) => r.id === row.id) !== -1;
+        if (!exists) {
+          rows.push(row);
+        }
+      });
+    },
+    []
+  );
+
   const setFocused = useCallback(
     (focused: boolean) => {
       updatePresence({ focusedSection: focused ? 'Scorecard' : null });
@@ -86,7 +112,7 @@ export function useScorecardRows() {
     [updatePresence]
   );
 
-  return { rows, updateRow, updateRowByMetricId, setFocused };
+  return { rows, updateRow, updateRowByMetricId, addRows, setFocused };
 }
 
 // Hook for real-time rocks
@@ -258,6 +284,29 @@ export function useIdsIssues() {
     []
   );
 
+  const addIssues = useMutation(
+    ({ storage }, newIssues: {
+      id: string;
+      title: string;
+      identify: string | null;
+      discuss: string | null;
+      solve: string | null;
+      ownerId: string | null;
+      dueDate: string | null;
+      isResolved: boolean;
+      orderIndex: number;
+    }[]) => {
+      const issues = storage.get('idsIssues');
+      newIssues.forEach((issue) => {
+        const exists = issues.findIndex((i: any) => i.id === issue.id) !== -1;
+        if (!exists) {
+          issues.push(issue);
+        }
+      });
+    },
+    []
+  );
+
   const deleteIssue = useMutation(
     ({ storage }, issueId: string) => {
       const issues = storage.get('idsIssues');
@@ -276,7 +325,7 @@ export function useIdsIssues() {
     [updatePresence]
   );
 
-  return { issues, updateIssue, addIssue, deleteIssue, setFocused };
+  return { issues, updateIssue, addIssue, addIssues, deleteIssue, setFocused };
 }
 
 // Hook for real-time new todos
@@ -306,6 +355,19 @@ export function useNewTodos() {
     []
   );
 
+  const addTodos = useMutation(
+    ({ storage }, newTodos: { id: string; userId: string; text: string; dueDate: string | null; orderIndex: number }[]) => {
+      const todos = storage.get('newTodos');
+      newTodos.forEach((todo) => {
+        const exists = todos.findIndex((t: any) => t.id === todo.id) !== -1;
+        if (!exists) {
+          todos.push(todo);
+        }
+      });
+    },
+    []
+  );
+
   const deleteTodo = useMutation(
     ({ storage }, todoId: string) => {
       const todos = storage.get('newTodos');
@@ -324,7 +386,7 @@ export function useNewTodos() {
     [updatePresence]
   );
 
-  return { todos, updateTodo, addTodo, deleteTodo, setFocused };
+  return { todos, updateTodo, addTodo, addTodos, deleteTodo, setFocused };
 }
 
 // Hook for real-time wrap feedback
@@ -354,6 +416,19 @@ export function useWrapFeedback() {
     []
   );
 
+  const addFeedbacks = useMutation(
+    ({ storage }, items: { id: string; type: 'positive' | 'negative'; text: string; orderIndex: number }[]) => {
+      const feedback = storage.get('wrapFeedback');
+      items.forEach((item) => {
+        const exists = feedback.findIndex((f: any) => f.id === item.id) !== -1;
+        if (!exists) {
+          feedback.push(item);
+        }
+      });
+    },
+    []
+  );
+
   const deleteFeedback = useMutation(
     ({ storage }, feedbackId: string) => {
       const feedback = storage.get('wrapFeedback');
@@ -372,7 +447,7 @@ export function useWrapFeedback() {
     [updatePresence]
   );
 
-  return { feedback, updateFeedback, addFeedback, deleteFeedback, setFocused };
+  return { feedback, updateFeedback, addFeedback, addFeedbacks, deleteFeedback, setFocused };
 }
 
 // Hook for real-time wrap scores
@@ -401,7 +476,20 @@ export function useWrapScores() {
     []
   );
 
-  return { scores, updateScore, addScore };
+  const addScores = useMutation(
+    ({ storage }, newScores: { id: string; userId: string; score: number }[]) => {
+      const scores = storage.get('wrapScores');
+      newScores.forEach((item) => {
+        const exists = scores.findIndex((s: any) => s.id === item.id) !== -1;
+        if (!exists) {
+          scores.push(item);
+        }
+      });
+    },
+    []
+  );
+
+  return { scores, updateScore, addScore, addScores };
 }
 
 // Note: useParkingLotItems hook removed - parking lot is now global and stored in database

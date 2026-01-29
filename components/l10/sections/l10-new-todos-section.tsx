@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronDown,
@@ -55,9 +55,29 @@ export function L10NewTodosSection({
     todos: liveTodos,
     updateTodo: updateLiveTodo,
     addTodo: addLiveTodo,
+    addTodos: addLiveTodos,
     deleteTodo: deleteLiveTodo,
     setFocused,
   } = useNewTodos();
+
+  // Sync initialTodos to Liveblocks if they're missing
+  useEffect(() => {
+    if (liveTodos && initialTodos.length > 0) {
+      const liveIds = new Set(liveTodos.map((t) => t.id));
+      const missingTodos = initialTodos
+        .filter((t) => !liveIds.has(t.id))
+        .map((t) => ({
+          id: t.id,
+          userId: t.userId,
+          text: t.text,
+          dueDate: t.dueDate ? t.dueDate.toString() : null,
+          orderIndex: t.orderIndex,
+        }));
+      if (missingTodos.length > 0) {
+        addLiveTodos(missingTodos);
+      }
+    }
+  }, [initialTodos, liveTodos, addLiveTodos]);
 
   // Use live todos if available, otherwise fall back to initial
   const todos = liveTodos ?? initialTodos.map((t) => ({

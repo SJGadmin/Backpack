@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ChevronDown, ChevronRight, BarChart3, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,24 @@ export function L10ScorecardSection({
   onConfigureMetrics,
 }: L10ScorecardSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const { rows: liveRows, updateRowByMetricId, setFocused } = useScorecardRows();
+  const { rows: liveRows, updateRowByMetricId, addRows, setFocused } = useScorecardRows();
+
+  // Sync initialRows to Liveblocks if they're missing
+  useEffect(() => {
+    if (liveRows && initialRows.length > 0) {
+      const liveIds = new Set(liveRows.map((r) => r.id));
+      const missingRows = initialRows
+        .filter((r) => !liveIds.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          metricId: r.metricId,
+          value: r.value,
+        }));
+      if (missingRows.length > 0) {
+        addRows(missingRows);
+      }
+    }
+  }, [initialRows, liveRows, addRows]);
 
   // Use live rows if available, otherwise fall back to initial
   const rows = liveRows ?? initialRows.map((r) => ({

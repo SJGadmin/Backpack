@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronDown,
@@ -44,9 +44,33 @@ export function L10IdsSection({
     issues: liveIssues,
     updateIssue: updateLiveIssue,
     addIssue: addLiveIssue,
+    addIssues: addLiveIssues,
     deleteIssue: deleteLiveIssue,
     setFocused,
   } = useIdsIssues();
+
+  // Sync initialIssues to Liveblocks if they're missing
+  useEffect(() => {
+    if (liveIssues && initialIssues.length > 0) {
+      const liveIds = new Set(liveIssues.map((i) => i.id));
+      const missingIssues = initialIssues
+        .filter((i) => !liveIds.has(i.id))
+        .map((i) => ({
+          id: i.id,
+          title: i.title,
+          identify: i.identify,
+          discuss: i.discuss,
+          solve: i.solve,
+          ownerId: i.ownerId,
+          dueDate: i.dueDate?.toISOString() || null,
+          isResolved: i.isResolved,
+          orderIndex: i.orderIndex,
+        }));
+      if (missingIssues.length > 0) {
+        addLiveIssues(missingIssues);
+      }
+    }
+  }, [initialIssues, liveIssues, addLiveIssues]);
 
   // Use live issues if available, otherwise fall back to initial
   // Note: We need to merge with initialIssues to get the owner object and issueNumber
