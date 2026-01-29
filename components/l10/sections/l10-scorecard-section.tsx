@@ -21,17 +21,35 @@ export function L10ScorecardSection({
   documentId,
   rows: initialRows,
   metrics,
+  onUpdate,
   onConfigureMetrics,
 }: L10ScorecardSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const { rows: liveRows, updateRowByMetricId, addRows, setFocused } = useScorecardRows();
+  const { rows: liveRows, updateRowByMetricId, addRows, deleteRow, setFocused } = useScorecardRows();
 
   // Sync initialRows to Liveblocks if they're missing
+  // Also replace temp rows with real ones from the database
   useEffect(() => {
     if (liveRows && initialRows.length > 0) {
-      const liveIds = new Set(liveRows.map((r) => r.id));
+      const liveIdSet = new Set(liveRows.map((r) => r.id));
+      const liveMetricIds = new Map(liveRows.map((r) => [r.metricId, r.id]));
+
       const missingRows = initialRows
-        .filter((r) => !liveIds.has(r.id))
+        .filter((r) => {
+          // Skip if we already have this exact row
+          if (liveIdSet.has(r.id)) return false;
+
+          // Check if we have a temp row for this metric that should be replaced
+          const existingId = liveMetricIds.get(r.metricId);
+          if (existingId && existingId.startsWith('temp-')) {
+            // Delete the temp row so the real one can be added
+            deleteRow(existingId);
+            return true;
+          }
+
+          // Add if no row exists for this metric
+          return !existingId;
+        })
         .map((r) => ({
           id: r.id,
           metricId: r.metricId,
@@ -41,7 +59,7 @@ export function L10ScorecardSection({
         addRows(missingRows);
       }
     }
-  }, [initialRows, liveRows, addRows]);
+  }, [initialRows, liveRows, addRows, deleteRow]);
 
   // Use live rows if available, otherwise fall back to initial
   const rows = liveRows ?? initialRows.map((r) => ({
@@ -67,9 +85,16 @@ export function L10ScorecardSection({
   const handleBlur = async (metricId: string) => {
     const valueStr = getRowValue(metricId);
     const numValue = valueStr ? parseFloat(valueStr) : null;
-    // Also persist to database
+    // Check if this is a temp row that needs to be replaced with a real one
+    const currentRow = rows?.find((r) => r.metricId === metricId);
+    const isTempRow = currentRow?.id.startsWith('temp-');
+    // Persist to database
     try {
       await updateScorecardRow(documentId, metricId, numValue);
+      // If this was a temp row, refresh to get the real ID
+      if (isTempRow) {
+        onUpdate();
+      }
     } catch (error) {
       console.error('Failed to persist scorecard row:', error);
     }

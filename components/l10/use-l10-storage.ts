@@ -87,6 +87,10 @@ export function useScorecardRows() {
         if (current) {
           rows.set(index, { ...current, value });
         }
+      } else {
+        // Create a temporary row if one doesn't exist yet
+        // This allows typing before the database row is created
+        rows.push({ id: `temp-${metricId}`, metricId, value });
       }
     },
     []
@@ -105,6 +109,17 @@ export function useScorecardRows() {
     []
   );
 
+  const deleteRow = useMutation(
+    ({ storage }, rowId: string) => {
+      const rows = storage.get('scorecardRows');
+      const index = rows.findIndex((r: any) => r.id === rowId);
+      if (index !== -1) {
+        rows.delete(index);
+      }
+    },
+    []
+  );
+
   const setFocused = useCallback(
     (focused: boolean) => {
       updatePresence({ focusedSection: focused ? 'Scorecard' : null });
@@ -112,7 +127,7 @@ export function useScorecardRows() {
     [updatePresence]
   );
 
-  return { rows, updateRow, updateRowByMetricId, addRows, setFocused };
+  return { rows, updateRow, updateRowByMetricId, addRows, deleteRow, setFocused };
 }
 
 // Hook for real-time rocks
