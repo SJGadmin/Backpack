@@ -37,10 +37,11 @@ import { createCard, moveCard, searchCards } from '@/lib/actions/cards';
 import { logout, getCurrentUser, getAllUsers } from '@/lib/actions/auth';
 import { Plus, Search, LogOut, Calendar as CalendarIcon, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function BoardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [board, setBoard] = useState<Board | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
@@ -69,6 +70,20 @@ export default function BoardPage() {
     loadCurrentUser();
     loadAllUsers();
   }, []);
+
+  // Open card from URL parameter (e.g., from Slack link)
+  useEffect(() => {
+    const cardId = searchParams.get('card');
+    if (cardId && board) {
+      const card = board.columns
+        .flatMap((col: ColumnType) => col.cards)
+        .find((c: CardType) => c.id === cardId);
+      if (card && !isDrawerOpen) {
+        setSelectedCard(card);
+        setIsDrawerOpen(true);
+      }
+    }
+  }, [board, searchParams]);
 
   const loadBoard = async () => {
     try {
