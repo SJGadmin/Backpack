@@ -526,20 +526,16 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                       className="flex items-center gap-2 p-2 rounded-md border"
                     >
                       <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <a
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium text-primary hover:underline truncate block"
+                          title={link.url}
                         >
-                          {link.title || link.url}
+                          {link.title || new URL(link.url).hostname}
                         </a>
-                        {link.title && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {link.url}
-                          </p>
-                        )}
                       </div>
                       <Button
                         variant="ghost"
