@@ -91,7 +91,7 @@ export function SortableTaskItem({
         onCheckedChange={() => onToggle(task)}
         className="mt-1"
       />
-      <div className="flex-1 space-y-2">
+      <div className="flex-1 min-w-0 space-y-2">
         {isEditing ? (
           <Input
             value={editText}
@@ -109,7 +109,7 @@ export function SortableTaskItem({
           />
         ) : (
           <p
-            className={`cursor-pointer ${
+            className={`cursor-pointer break-words ${
               task.completed
                 ? 'line-through text-muted-foreground'
                 : taskOverdue

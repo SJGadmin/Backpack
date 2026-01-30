@@ -285,9 +285,9 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
-        <ScrollArea className="h-full">
-          <div className="p-6 space-y-6">
+      <SheetContent side="right" className="w-full sm:max-w-2xl p-0 overflow-hidden">
+        <ScrollArea className="h-full w-full">
+          <div className="p-6 space-y-6 max-w-full overflow-hidden">
             <SheetHeader>
               <SheetTitle className="sr-only">Card Details</SheetTitle>
               <div className="flex items-start gap-2">
