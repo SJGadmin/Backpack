@@ -71,6 +71,18 @@ interface CardDrawerProps {
   onUpdate?: () => void;
 }
 
+// Helper to detect @mentions in text
+function detectMentions(text: string, userNames: string[]): string[] {
+  const mentions: string[] = [];
+  for (const name of userNames) {
+    const pattern = new RegExp(`@${name}\\b`, 'gi');
+    if (pattern.test(text)) {
+      mentions.push(name);
+    }
+  }
+  return mentions;
+}
+
 export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawerProps) {
   const router = useRouter();
   const [title, setTitle] = useState('');
@@ -82,6 +94,9 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
   const [localTasks, setLocalTasks] = useState<any[]>([]);
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkTitle, setNewLinkTitle] = useState('');
+
+  // Detect mentions in comment
+  const detectedMentions = detectMentions(newComment, users.map(u => u.name));
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -614,6 +629,16 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
+                    {detectedMentions.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Mentioning:</span>
+                        {detectedMentions.map((name) => (
+                          <Badge key={name} variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            @{name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                     <Button onClick={handleAddComment}>Post Comment</Button>
                   </div>
                 </div>
