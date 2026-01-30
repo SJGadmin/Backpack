@@ -586,7 +586,7 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                           {comment.createdBy.name.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 space-y-1">
+                      <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">
                             {comment.createdBy.name}
@@ -595,7 +595,7 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                             {format(new Date(comment.createdAt), 'MMM d, h:mm a')}
                           </span>
                         </div>
-                        <p className="text-sm">{comment.textPlain}</p>
+                        <p className="text-sm break-all">{comment.textPlain}</p>
                       </div>
                       <Button
                         variant="ghost"
@@ -609,7 +609,7 @@ export function CardDrawer({ card, isOpen, onClose, users, onUpdate }: CardDrawe
                   ))}
                   <div className="space-y-2">
                     <Textarea
-                      placeholder="Add a comment... (use @Justin or @Grant to mention)"
+                      placeholder="Add a comment... (use @Name to mention someone)"
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
