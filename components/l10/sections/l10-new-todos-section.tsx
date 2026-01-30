@@ -9,6 +9,7 @@ import {
   Plus,
   X,
   CalendarIcon,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { createNewTodo, updateNewTodo, deleteNewTodo } from '@/lib/actions/l10';
+import { createNewTodo, updateNewTodo, deleteNewTodo, sendDocumentTodosToSlack } from '@/lib/actions/l10';
 import { useNewTodos } from '../use-l10-storage';
 import { L10SectionPresence } from '../l10-presence';
 import type { L10NewTodo, UserInfo } from '@/lib/types';
@@ -50,6 +51,7 @@ export function L10NewTodosSection({
   const [newTodoDueDate, setNewTodoDueDate] = useState<Date | undefined>();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [isSendingToSlack, setIsSendingToSlack] = useState(false);
 
   const {
     todos: liveTodos,
@@ -192,24 +194,58 @@ export function L10NewTodosSection({
   const handleFocus = () => setFocused(true);
   const handleBlurFocus = () => setFocused(false);
 
+  const handleSendToSlack = async () => {
+    if (todos.length === 0) {
+      toast.error('No to-dos to send');
+      return;
+    }
+
+    setIsSendingToSlack(true);
+    try {
+      const result = await sendDocumentTodosToSlack(documentId);
+      if (result.success) {
+        toast.success('To-dos sent to Slack');
+      } else {
+        toast.error(result.error || 'Failed to send to Slack');
+      }
+    } catch (error) {
+      toast.error('Failed to send to Slack');
+    } finally {
+      setIsSendingToSlack(false);
+    }
+  };
+
   return (
     <div className="bg-card rounded-lg border">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 p-4 hover:bg-accent/50 transition-colors"
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-        <ClipboardList className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">New To-Dos</h2>
-        <span className="text-sm text-muted-foreground ml-2">
-          (From today)
-        </span>
-        <L10SectionPresence section="New Todos" />
-      </button>
+      <div className="flex items-center">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 flex items-center gap-2 p-4 hover:bg-accent/50 transition-colors"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+          <ClipboardList className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">New To-Dos</h2>
+          <span className="text-sm text-muted-foreground ml-2">
+            (From today)
+          </span>
+          <L10SectionPresence section="New Todos" />
+        </button>
+        <div className="pr-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSendToSlack}
+            disabled={isSendingToSlack || todos.length === 0}
+          >
+            <Send className="h-4 w-4 mr-1" />
+            {isSendingToSlack ? 'Sending...' : 'Send to Slack'}
+          </Button>
+        </div>
+      </div>
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4">

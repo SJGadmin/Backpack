@@ -3,68 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from './auth';
+import { extractMentions, sendCommentMentionNotification } from '@/lib/slack';
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-}
-
-async function sendSlackNotification(
-  cardTitle: string,
-  cardId: string,
-  commentText: string,
-  mentionedUser: string,
-  authorName: string
-) {
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
-
-  if (!webhookUrl) {
-    console.log('Slack webhook not configured, skipping notification');
-    return;
-  }
-
-  try {
-    const cardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/board?card=${cardId}`;
-
-    const message = {
-      text: `@${mentionedUser} was mentioned in "${cardTitle}"`,
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*${authorName}* mentioned *@${mentionedUser}* in <${cardUrl}|${cardTitle}>`,
-          },
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `> ${commentText.substring(0, 200)}${commentText.length > 200 ? '...' : ''}`,
-          },
-        },
-      ],
-    };
-
-    await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(message),
-    });
-  } catch (error) {
-    console.error('Failed to send Slack notification:', error);
-  }
-}
-
-function extractMentions(text: string): string[] {
-  const mentions: string[] = [];
-  const mentionPattern = /@(Justin|Grant)/gi;
-  let match;
-
-  while ((match = mentionPattern.exec(text)) !== null) {
-    mentions.push(match[1]);
-  }
-
-  return mentions;
 }
 
 export async function createComment(cardId: string, text: string) {
@@ -88,7 +30,7 @@ export async function createComment(cardId: string, text: string) {
   });
 
   // Check for mentions and send Slack notifications
-  const mentions = extractMentions(textPlain);
+  const mentions = await extractMentions(textPlain);
   if (mentions.length > 0) {
     const card = await prisma.card.findUnique({
       where: { id: cardId },
@@ -97,7 +39,7 @@ export async function createComment(cardId: string, text: string) {
 
     if (card) {
       for (const mention of mentions) {
-        await sendSlackNotification(
+        await sendCommentMentionNotification(
           card.title,
           cardId,
           textPlain,

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from './auth';
+import { sendNewTodosToSlack as sendTodosToSlackUtil } from '@/lib/slack';
 
 // ============================================
 // FOLDER ACTIONS
@@ -799,6 +800,44 @@ export async function deleteNewTodo(todoId: string) {
   }
 
   revalidatePath('/board');
+}
+
+export async function sendDocumentTodosToSlack(documentId: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // Get the document with its todos
+  const document = await prisma.l10Document.findUnique({
+    where: { id: documentId },
+    select: {
+      id: true,
+      title: true,
+      newTodos: {
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
+    },
+  });
+
+  if (!document) {
+    return { success: false, error: 'Document not found' };
+  }
+
+  const todosForSlack = document.newTodos.map((todo: {
+    text: string;
+    user: { name: string };
+    dueDate: Date | null;
+    isCompleted: boolean;
+  }) => ({
+    text: todo.text,
+    userName: todo.user.name,
+    dueDate: todo.dueDate,
+    isCompleted: todo.isCompleted,
+  }));
+
+  return sendTodosToSlackUtil(document.title, document.id, todosForSlack);
 }
 
 // ============================================
