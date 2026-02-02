@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -39,7 +39,16 @@ import { Plus, Search, LogOut, Calendar as CalendarIcon, FileText } from 'lucide
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function BoardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
+      <BoardPageContent />
+    </Suspense>
+  );
+}
+
+function BoardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [board, setBoard] = useState<Board | null>(null);
